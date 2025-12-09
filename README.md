@@ -91,7 +91,7 @@ This script is required to read the TMC register data.
         # ---- 4. Heat Bed & Soak ----
         M117 Heating bed…
         M140 S{target_bed}
-        M104 S150 ; Preheat nozzle slightly but don't ooze
+        M104 S150 # Preheat nozzle slightly but don't ooze
 
         # ---- 5. Homing & QGL ----
         _CG28
@@ -158,7 +158,7 @@ This script is required to read the TMC register data.
             {% set max_temp_safety = 300 %}
             
         {% elif 'TPU' in material %}
-            # Disable Auto-Temp for TPU (Risk of foaming)
+            # Disable Auto-Temp for TPU (thermal instability can cause foaming/inconsistent extrusion)
             {% set load_k = 0.0 %}
             {% set speed_k = 0.0 %}
             {% set pa_val = 0.20 %} 
@@ -172,7 +172,7 @@ This script is required to read the TMC register data.
 
         # --- APPLY AUTO-TEMP ---
         {% if load_k > 0 or speed_k > 0 %}
-            AT_SET_VISC_K K={load_k}               # Set TMC Sensitivity
+            AT_SET_VISC_K K={load_k}          # Set TMC Sensitivity
             AT_SET_FLOW_K K={speed_k}         # Set Speed Sensitivity
             AT_SET_MAX MAX={max_temp_safety}  # Set Safety Ceiling
             AT_ENABLE
