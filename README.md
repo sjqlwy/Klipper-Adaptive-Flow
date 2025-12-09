@@ -56,3 +56,39 @@ driver_name: tmc2209 extruder
 
 [save_variables]
 filename: ~/printer_data/config/sfs_auto_flow_vars.cfg
+
+
+[gcode_macro PRINT_START]
+gcode:
+    # ... (Your heating and homing code) ...
+    
+    # Initialize Adaptive Flow
+    AT_RESET_STATE
+    AT_ENABLE
+
+
+[gcode_macro PRINT_END]
+gcode:
+    # Disable Adaptive Flow
+    AT_DISABLE
+    
+    # ... (Your parking and cooldown code) ...
+
+
+
+Tuning & Usage
+1. Flow K (Speed Boost)
+How much temp to add based on speed.
+Command: AT_SET_FLOW_K K=0.5
+Meaning: For every 1mm³/s of flow, add ~0.5°C.
+2. Viscosity K (Resistance Boost)
+How much temp to add if the extruder is struggling (high load).
+Command: AT_SET_VISC_K K=0.1
+Meaning: If strain increases, boost temp to melt plastic faster.
+3. Crash Sensitivity
+To adjust how sensitive the crash detection is, edit auto_flow.cfg:
+load_delta > 20: Lower this number to make it more sensitive (detect smaller blobs). Raise it if you get false positives.
+Requirements
+Klipper Firmware
+TMC Stepper Driver on Extruder (TMC2209, TMC2130, TMC5160)
+[save_variables] enabled
