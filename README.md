@@ -60,7 +60,7 @@ This script is required to read the TMC register data.
     filename: ~/printer_data/config/sfs_auto_flow_vars.cfg
     ```
 
-3.  Add the following to your `PRINT_START` macro (or use this complete example):
+3.  Add the following to your `PRINT_START` macro :
 
     ```ini
     [gcode_macro PRINT_START]
@@ -149,7 +149,7 @@ This script is required to read the TMC register data.
         {% endif %}
 
     
-4.  Add the following to your `PRINT_END` macro (or use this complete example):
+4.  Add the following to your `PRINT_END` macro :
 
     ```ini
     [gcode_macro PRINT_END]
