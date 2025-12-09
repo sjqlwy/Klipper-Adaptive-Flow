@@ -88,39 +88,7 @@ This script is required to read the TMC register data.
         {% set x_mid   = (x_max + x_min) / 2.0 %}
         {% set y_mid   = (y_max + y_min) / 2.0 %}
 
-        # ---- 4. Heat Bed & Soak ----
-        M117 Heating bed…
-        M140 S{target_bed}
-        M104 S150 # Preheat nozzle slightly but don't ooze
-
-        # ---- 5. Homing & QGL ----
-        _CG28
-
-        # Move to middle
-        G90
-        G1 Z20 F9000
-        G1 X{x_mid} Y{y_mid} F12000
-
-        # Wait for Bed
-        M190 S{target_bed}
-        TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={target_bed-1} MAXIMUM={target_bed+3}
-
-        # QGL
-        M117 QGL…
-        QUAD_GANTRY_LEVEL
-        G28 Z
-
-        # ---- 6. Bed Mesh ----
-        M117 Eddy mesh…
-        BED_MESH_CLEAR
-        BED_MESH_CALIBRATE METHOD=rapid_scan ADAPTIVE=1
         
-        # Move clear
-        G1 X{x_mid} Y{y_mid} Z10 F12000
-
-        # ---- 7. Heat Hotend ----
-        M117 Heating hotend…
-        M109 S{target_extruder}
 
         # ============================================================
         #  MATERIAL CONFIGURATION (HYBRID: Speed + Load)
