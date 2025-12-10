@@ -1,4 +1,4 @@
-# Klipper Adaptive Flow & Crash Guard
+# Klipper Adaptive Flow 
 
 **A closed-loop flow control detection system for Klipper.**
 
