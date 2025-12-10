@@ -24,9 +24,9 @@ This script is required to read the TMC register data.
     [include auto_flow.cfg]
 
     [extruder_monitor]
-   // This must match the name of your extruder stepper section
+    #This must match the name of your extruder stepper section
     stepper: extruder
-   //Change this to match your specific driver (e.g., tmc2209 extruder)
+    #Change this to match your specific driver (e.g., tmc2209 extruder)
     driver_name: tmc2209 extruder
 
     [save_variables]
