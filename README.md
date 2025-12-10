@@ -3,27 +3,24 @@
 **A closed-loop flow control detection system for Klipper.**
 
 This system uses the TMC driver feedback from your extruder to actively manage temperature and pressure advance.
-Configured for 2209 drivers.
+<br>Configured for TMC 2209 drivers.
+<br> In your slicer filament settings, disable pressure advance. 
 
 ## Installation
 
 ### Step 1: Install the Python Extension
 This script is required to read the TMC register data.
 
-1.  Copy `extras/extruder_monitor.py` to your Klipper extras directory:
-    ```bash
-    cp extras/extruder_monitor.py ~/klipper/klippy/extras/
-    ```
+1.  Copy `extruder_monitor.py` to your Klipper extras directory:
+    
 2.  Restart the Klipper service:
-    ```bash
-    sudo service klipper restart
-    ```
+    
 
 ### Step 2: Install the Configuration
-1.  Copy `config/auto_flow.cfg` to your configuration directory (usually `~/printer_data/config/`).
+1.  Copy `auto_flow.cfg` to your configuration directory (usually `~/printer_data/config/`).
 2.  Open your `printer.cfg` and add the following:
 
-    ```ini
+    
     [include auto_flow.cfg]
 
     [extruder_monitor]
