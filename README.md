@@ -31,7 +31,7 @@ This script is required to read the TMC register data.
 
     [save_variables]
     filename: ~/printer_data/config/sfs_auto_flow_vars.cfg
-  
+  ```
 
 4.  Add the following to your `PRINT_START` macro :
 
