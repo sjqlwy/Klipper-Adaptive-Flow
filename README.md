@@ -77,16 +77,7 @@ This script is required to read the TMC register data.
         # ---- 2. Reset Systems ----
         AT_RESET_STATE
         AT_DISABLE
-        
-        # ---- 3. Geometry helpers ----
-        {% set x_max   = printer.toolhead.axis_maximum.x|float %}
-        {% set y_max   = printer.toolhead.axis_maximum.y|float %}
-        {% set x_min   = printer.toolhead.axis_minimum.x|float %}
-        {% set y_min   = printer.toolhead.axis_minimum.y|float %}
-        {% set x_mid   = (x_max + x_min) / 2.0 %}
-        {% set y_mid   = (y_max + y_min) / 2.0 %}
-
-        
+            
 
         # ============================================================
         #  MATERIAL CONFIGURATION (HYBRID: Speed + Load)
