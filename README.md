@@ -40,7 +40,7 @@ This script is required to read the TMC register data.
     driver_SGTHRS: 120
 ```
 
-5.  Add the following to your `PRINT_START` macro :
+4.  Add the following to your `PRINT_START` macro :
 
     ```ini
     [gcode_macro PRINT_START]
@@ -120,7 +120,7 @@ This script is required to read the TMC register data.
         {% endif %}
 
     
-6.  Add the following to your `PRINT_END` macro :
+5.  Add the following to your `PRINT_END` macro :
 
     ```ini
     [gcode_macro PRINT_END]
