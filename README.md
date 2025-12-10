@@ -24,10 +24,10 @@ This script is required to read the TMC register data.
     [include auto_flow.cfg]
 
     [extruder_monitor]
- <br>  // This must match the name of your extruder stepper section
- <br>   stepper: extruder
-<br>   //Change this to match your specific driver (e.g., tmc2209 extruder)
- <br>   driver_name: tmc2209 extruder
+   // This must match the name of your extruder stepper section
+    stepper: extruder
+   //Change this to match your specific driver (e.g., tmc2209 extruder)
+    driver_name: tmc2209 extruder
 
     [save_variables]
     filename: ~/printer_data/config/sfs_auto_flow_vars.cfg
