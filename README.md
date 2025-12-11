@@ -12,8 +12,9 @@ This system uses the TMC driver feedback from your extruder to actively manage t
 This script is required to read the TMC register data.
 
 1.  Copy `extruder_monitor.py` to your Klipper extras directory:
+2.  ~/klipper/klippy/extras/
     
-2.  Restart the Klipper service:
+3.  Restart the Klipper service:
     
 
 ### Step 2: Install the Configuration
