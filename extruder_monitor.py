@@ -1,9 +1,3 @@
----
-
-### 2. `extras/extruder_monitor.py`
-*Save this file in the `extras` folder.*
-
-```python
 import logging
 
 class ExtruderMonitor:
@@ -17,7 +11,7 @@ class ExtruderMonitor:
         try:
             self.tmc = self.printer.lookup_object(self.driver_name)
         except Exception as e:
-             raise self.printer.config_error(f"ExtruderMonitor: Driver '{self.driver_name}' not found. Check printer.cfg.")
+             raise self.printer.config_error(f"ExtruderMonitor: Driver '{self.driver_name}' not found.")
 
         gcode = self.printer.lookup_object('gcode')
         gcode.register_command("GET_EXTRUDER_LOAD", self.cmd_GET_EXTRUDER_LOAD,
@@ -32,7 +26,6 @@ class ExtruderMonitor:
             gcmd.respond_info(f"Extruder Load (SG_RESULT): {val}")
         except Exception as e:
             try:
-                # Fallback for some TMC implementations
                 val = self.tmc.get_register('SG_RESULT')
                 gcmd.respond_info(f"Extruder Load (via Helper): {val}")
             except:
