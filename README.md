@@ -62,6 +62,13 @@ filename: ~/printer_data/config/sfs_auto_flow_vars.cfg
 # sensor_type: temperature_mcu
 # sensor_mcu: EBBCan
 ```
+```
+In your TMC section of your extruder place the following
+[tmc2209 extruder]
+run_current: 0.650
+stealthchop_threshold: 0
+driver_SGTHRS: 120
+```
 
 🚀 Usage <br/>
 Start Macro <br/>
