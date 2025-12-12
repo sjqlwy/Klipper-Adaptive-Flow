@@ -36,11 +36,11 @@ Uses a Z-height monitor to detect layer changes automatically. You do not need t
 This script is required to read the TMC register data directly.
 
 1.  Create a file named `extruder_monitor.py` in your extras directory: `~/klipper/klippy/extras/extruder_monitor.py`
-
+    Copy the extruder_monitor.py
 
 2: Install the Configuration
 Create a file named auto_flow.cfg in your config directory: ~/printer_data/config/auto_flow.cfg
-
+    Copy auto_flow.cfg
 
 Step 3: Edit printer.cfg
 Open your printer.cfg and add the following lines.
