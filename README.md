@@ -126,8 +126,8 @@ gcode:
     G4 P500
     GET_EXTRUDER_LOAD
 ```
-Lift the Z axis or remove the filament from the hotend (so it extrudes with ZERO resistance).<br/>
-Run AT_CHECK_BASELINE.<br/>
+Lift the Z axis or remove the filament from the hotend (so it extrudes with ZERO resistance).<br/><br/>
+2. Run AT_CHECK_BASELINE.<br/>
 Look at the Console. You will see numbers like:<br/>
 Extruder Load (SG_RESULT): 118<br/>
 Extruder Load (SG_RESULT): 120<br/>
@@ -145,8 +145,8 @@ Now the script knows that 120 is "Zero Strain". Any number lower than 120 means 
 
 **Step 3: Crash Sensitivity (Blob Detection)**
 If the printer triggers the "Slowing down" recovery mode randomly when there is no actual blob or tangle, your motor signal is too noisy.
-Open auto_flow.cfg.
-Find this logic block:
+Open auto_flow.cfg.<br/>
+Find this logic block:<br/>
 ```
 {% if filament_speed > 2.0 and load_delta > 20 %}
 Increase the 20:
