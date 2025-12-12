@@ -36,13 +36,13 @@ Uses a Z-height monitor to detect layer changes automatically. You do not need t
 This script is required to read the TMC register data directly.
 
 1.  Create a file named `extruder_monitor.py` in your extras directory: `~/klipper/klippy/extras/extruder_monitor.py`
-    Copy the extruder_monitor.py
+    <br/>Copy the extruder_monitor.py
 
 2: Install the Configuration
 Create a file named auto_flow.cfg in your config directory: ~/printer_data/config/auto_flow.cfg
-    Copy auto_flow.cfg
+   <br/> Copy auto_flow.cfg
 
-Step 3: Edit printer.cfg
+3: Edit printer.cfg
 Open your printer.cfg and add the following lines.
 ```
 [include auto_flow.cfg]
@@ -69,10 +69,14 @@ run_current: 0.650
 stealthchop_threshold: 0
 driver_SGTHRS: 120
 ```
-
+4. update your machine settings Gcode in orca:
+   ```
+   PRINT_START BED={first_layer_bed_temperature[0]} EXTRUDER={first_layer_temperature[0]} MATERIAL={filament_type[0]}
+```
+   
 🚀 Usage <br/>
 Start Macro <br/>
-Replace your existing PRINT_START with the example. <br/>This handles the sensitivity tuning for different materials automatically.
+Adapt your PRINT_START from my example. <br/>This handles the sensitivity tuning for different materials automatically.
 
 #🔧 Tuning Guide
 ```
