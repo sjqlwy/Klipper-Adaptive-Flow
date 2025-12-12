@@ -77,9 +77,11 @@ driver_SGTHRS: 120
    PRINT_START BED={first_layer_bed_temperature[0]} EXTRUDER={first_layer_temperature[0]} MATERIAL={filament_type[0]}
 ```
    
-🚀 Usage <br/>
-Start Macro <br/>
-Adapt your PRINT_START from my example. <br/>This handles the sensitivity tuning for different materials automatically.
+###Step 4: Start Macro <br/>
+Adapt your PRINT_START from my example. 
+br/>This handles the sensitivity tuning for different materials automatically.
+
+
 
 #🔧 Tuning Guide
 ```
