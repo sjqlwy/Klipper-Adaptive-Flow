@@ -72,18 +72,18 @@ run_current: 0.650
 stealthchop_threshold: 0
 driver_SGTHRS: 120
 ```
-###Step 3: update your machine settings Gcode in orca:
+### Step 3: update your machine settings Gcode in orca:
    ```
    PRINT_START BED={first_layer_bed_temperature[0]} EXTRUDER={first_layer_temperature[0]} MATERIAL={filament_type[0]}
 ```
    
-###Step 4: Start Macro <br/>
+### Step 4: Start Macro <br/>
 Adapt your PRINT_START from my example. 
 <br/>This handles the sensitivity tuning for different materials automatically.
 
 
 
-#🔧 Tuning Guide
+## 🔧 Tuning Guide
 ```
 1. Flow K (Speed Boost)
 How much temp to add based on speed.
@@ -98,7 +98,6 @@ Meaning: If strain increases, boost temp to melt plastic faster.
 3. Crash Sensitivity
 To adjust how sensitive the crash detection is, edit auto_flow.cfg. Look for the logic block:
 {% if filament_speed > 2.0 and load_delta > 20 %}
-```
+
 20: Lower this number to make it more sensitive (detect smaller blobs). Raise it if you get false positives.
-code
-Code
+```
