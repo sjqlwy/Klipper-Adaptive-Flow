@@ -35,14 +35,16 @@ Uses a Z-height monitor to detect layer changes automatically. You do not need t
 ### Step 1: Install the Python Extension
 This script is required to read the TMC register data directly.
 
-1.  Create a file named `extruder_monitor.py` in your extras directory: `~/klipper/klippy/extras/extruder_monitor.py`
+a.  Create a file named `extruder_monitor.py` in your extras directory: `~/klipper/klippy/extras/extruder_monitor.py`
     <br/>Copy the extruder_monitor.py
 
-2: Install the Configuration
+b: Install the Configuration
 Create a file named auto_flow.cfg in your config directory: ~/printer_data/config/auto_flow.cfg
    <br/> Copy auto_flow.cfg
 
-3: Edit printer.cfg
+c: restart klipper 
+
+### Step 2: Edit printer.cfg
 Open your printer.cfg and add the following lines.
 ```
 [include auto_flow.cfg]
@@ -55,12 +57,12 @@ driver_name: tmc2209 extruder
 [save_variables]
 filename: ~/printer_data/config/sfs_auto_flow_vars.cfg
 ```
- --- OPTIONAL: Toolhead Temp ---<br/>
+ --- Toolhead Temp ---<br/>
  If using EBB36/SB2209, name your temp sensor "Toolhead_Temp" for better accuracy.
-```
-# [temperature_sensor Toolhead_Temp]
-# sensor_type: temperature_mcu
-# sensor_mcu: EBBCan
+
+[temperature_sensor Toolhead_Temp]
+sensor_type: temperature_mcu
+sensor_mcu: EBBCan
 ```
 ```
 In your TMC section of your extruder place the following
@@ -69,7 +71,7 @@ run_current: 0.650
 stealthchop_threshold: 0
 driver_SGTHRS: 120
 ```
-4. update your machine settings Gcode in orca:
+###Step 3: update your machine settings Gcode in orca:
    ```
    PRINT_START BED={first_layer_bed_temperature[0]} EXTRUDER={first_layer_temperature[0]} MATERIAL={filament_type[0]}
 ```
