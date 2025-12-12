@@ -85,7 +85,7 @@ Adapt your PRINT_START from my example.
 
 
 
-## 🔧 Tuning Guide
+### 🔧 Tuning Guide
 ```
 ## 1. Standard Tuning (K-Values)
 These values control how aggressively the temperature boosts based on speed and resistance.
@@ -108,7 +108,7 @@ The script assumes a baseline motor load of **60** when extruding into thin air.
 **Step 1: Run the Test**
 Add this temporary macro to your config and run `AT_CHECK_BASELINE`:
 
-```ini
+```
 [gcode_macro AT_CHECK_BASELINE]
 gcode:
     {% set temp = params.TEMP|default(210)|int %}
@@ -121,6 +121,24 @@ gcode:
     GET_EXTRUDER_LOAD
     G4 P500
     GET_EXTRUDER_LOAD
+```
+***Step 2: Update Config
+Take the average number returned in the console (e.g., 120).
+Open auto_flow.cfg and find this line inside _AUTO_TEMP_CORE:
+```
+{% set strain = 60 - corrected_load %}
+Change 60 to your new number (e.g., 120).
+```
+***Step 3: Crash Sensitivity (Blob Detection)
+If the printer triggers the "Slowing down" recovery mode randomly when there is no actual blob or tangle, your motor signal is too noisy.
+Open auto_flow.cfg.
+Find this logic block:
+```
+{% if filament_speed > 2.0 and load_delta > 20 %}
+Increase the 20:
+20: Standard NEMA 14 (LDO-36STH20).
+30-40: Noisy/Weak motors (False positives).
+10-15: Strong NEMA 17 motors (Need high sensitivity).
 
 ```
 
