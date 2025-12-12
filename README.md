@@ -133,10 +133,11 @@ gcode:
     M117 Done.
 ```
 1a. Add this to your Extruder section<br/>
-    ```
+```
     max_extrude_only_distance: 101.0
-    ```
-Lift the Z axis or remove the filament from the hotend (so it extrudes with ZERO resistance).<br/><br/>
+```
+
+**Lift the Z axis or remove the filament from the hotend (so it extrudes with ZERO resistance).**<br/><br/>
 2. Run  **AT_CHECK_BASELINE.**<br/>
 Look at the Console. You will see numbers like:<br/>
 Extruder Load (SG_RESULT): 118<br/>
