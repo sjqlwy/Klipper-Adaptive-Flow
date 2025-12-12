@@ -110,7 +110,7 @@ The script relies on knowing what your motor "feels like" when it is free-spinni
 **If this baseline is wrong, the Viscosity/Strain Boost will not work.**
 
 ### Step 1: Run the Test
-1.  Add this temporary macro to your `printer.cfg` (you can delete it later).
+1.  Add this temporary macro to your `printer.cfg` (you can delete it later)
 
 ```
 [gcode_macro AT_CHECK_BASELINE]
@@ -132,6 +132,10 @@ gcode:
     GET_EXTRUDER_LOAD
     M117 Done.
 ```
+1a. Add this to your Extruder section<br/>
+    ```
+    max_extrude_only_distance: 101.0
+    ```
 Lift the Z axis or remove the filament from the hotend (so it extrudes with ZERO resistance).<br/><br/>
 2. Run  **AT_CHECK_BASELINE.**<br/>
 Look at the Console. You will see numbers like:<br/>
