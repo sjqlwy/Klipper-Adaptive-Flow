@@ -161,3 +161,19 @@ If your `AT_CHECK_BASELINE` returns extremely low numbers (0-10) even when spinn
 2.  **Verify & Accept:** Run the baseline test again.
     *   If the number jumps up (e.g. to 60+), great. Use that.
     *   **Note:** Many generic/clone NEMA 14 motors will **always** read low (e.g., 12-16) even with Autotune. **This is normal.** Just set your `sensor_baseline` to 16 and your `noise_filter` to 2. The script works fine with low numbers as long as they are stable.
+    *   
+
+
+## 📊 Hardware Limits & Benchmarks
+
+The Adaptive Flow script works by demanding **extra heat** during fast moves. However, it cannot create energy that your hardware is unable to supply. If your heater hits 100% duty cycle, the temperature will drop regardless of what the script commands.
+
+### Case Study: E3D Revo High Flow (40W)
+*   **Setup:** Revo HF 0.4mm Nozzle + **40W** HeaterCore.
+*   **Material:** PETG.
+*   **Script Settings:** Standard Auto-Flow defaults.
+*   **Result:** Flow remains stable up to **~26 mm³/s**.
+*   **The Ceiling:** Above 26 mm³/s, the 40W heater saturates (hits 100% power). It physically cannot generate enough heat to maintain the temperature, let alone boost it.
+
+**Conclusion:**
+To push reliably past **30 mm³/s** while using this script, a **60W HeaterCore** is required. The 60W core provides the necessary "headroom" for the script to apply Turbo/Boost commands during high-speed maneuvers without bottoming out the temperature.
