@@ -30,6 +30,18 @@ Uses a Z-height monitor to detect layer changes automatically. You do not need t
 
 ---
 
+This system is tuned and verified specifically for the following hardware ecosystem. While the logic works on any Klipper printer, the **tuning values** provided in this guide assume:
+
+*   **Hotend:** E3D Revo (High Flow or Standard).
+*   **Extruder:** Voron StealthBurner (CW2) or Sherpa Mini.
+*   **Motor:** NEMA 14 Pancake (LDO-36STH20 or Generic Clones).
+*   **Driver:** TMC2209 via UART.
+*   **Electronics:** BigTreeTech EBB36 or SB2209 (CAN Bus).
+
+*If you use standard NEMA 17 motors or different drivers, you will need to adjust the `sensor_baseline` and `noise_filter` significantly.*
+
+---
+
 ## 📦 Installation
 
 ### Step 1: Install the Python Extension
