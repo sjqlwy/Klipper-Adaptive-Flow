@@ -1,46 +1,36 @@
+# Klipper Adaptive Flow & Crash Guard (E3D Revo Edition)
 
-# Klipper Adaptive Flow & Crash Guard
+**A closed-loop flow control system tuned specifically for the E3D Revo ecosystem.**
 
-**A closed-loop flow control and artifact detection system for Klipper.**
+This system uses TMC driver feedback to actively manage temperature, pressure advance, and print speed. It allows **Revo High Flow** nozzles to push past their rated limits safely, and makes **Standard Revo** nozzles behave like high-flow hotends during fast moves.
 
-This system uses the TMC driver feedback from your extruder to actively manage temperature, pressure advance, and print speed in real-time. It requires **no external sensors** and **no slicer modifications**.
+## ⚠️ Hardware Requirements
 
-## ✨ Features
+This script is **only** tested and verified on the following hardware. Using other hotends (Dragon, Rapido, V6) is **not supported** because the thermal boost curves are calibrated specifically for Revo heater cores.
 
-### 1. 🌊 Hydro-Dynamic Temp Boosting
-Automatically raises the Hotend Temperature as flow rate increases (Feed-Forward). This compensates for the thermal lag of the heater block during high-speed moves.
-
-### 2. 🛡️ Extrusion Crash Detection
-Monitors the extruder motor for sudden resistance spikes (Load Deltas).
-*   **Blobs/Tangles/Clogs:** If the nozzle hits a blob or the filament tangles, the resistance spikes.
-*   **Automatic Recovery:** If >3 spikes are detected in a single layer, the system automatically slows the print speed to **50%** for the next 3 layers to allow the print to recover, then restores full speed.
-
-### 3. 🧠 Smart Cornering ("Sticky Heat")
-Prevents the "Bulging Corner" issue common with other auto-temp scripts.
-*   The script heats up fast but cools down *very slowly*.
-*   This ensures the plastic remains fluid during the deceleration phase of a corner, preventing internal pressure buildup.
-
-### 4. 📐 Dynamic Pressure Advance
-Automatically **lowers** Pressure Advance (PA) as the temperature rises.
-*   Hotter plastic is more fluid and requires less PA.
-*   This prevents "gaps" or "cutting corners" caused by aggressive PA at high temperatures.
-
-### 5. 👁️ Machine-Side Layer Watcher
-Uses a Z-height monitor to detect layer changes automatically. You do not need to add custom G-Code to your Slicer.
+*   **Hotend:** E3D Revo (Standard or High Flow nozzle).
+*   **HeaterCore:** 40W (Standard Speed) or 60W (High Speed/High Flow).
+*   **Extruder:** Voron StealthBurner (CW2), Sherpa Mini, or Orbiter.
+*   **Motor:** NEMA 14 Pancake (LDO-36STH20 or Generic).
+*   **Electronics:** BTT EBB36 / SB2209 (CAN Bus) or similar with TMC2209.
 
 ---
 
-### Please Note: 
+## ✨ Features
 
-This system is tuned and verified specifically for the following hardware ecosystem. While the logic works on any Klipper printer, the **tuning values** provided in this guide assume:
+### 1. Revo-Optimized Temp Boosting
+Automatically raises the temperature as flow rate increases. The script includes specific "Flow Gates" calculated for Revo geometry:
+*   **Standard Nozzle:** Boosts start at **8mm³/s** (Breaking the 11mm³ limit).
+*   **High Flow Nozzle:** Boosts start at **15mm³/s** (Breaking the 25mm³ limit).
 
-*   **Hotend:** E3D Revo (High Flow or Standard).
-*   **Extruder:** Voron StealthBurner (CW2) or Sherpa Mini.
-*   **Motor:** NEMA 14 Pancake (LDO-36STH20 or Generic Clones).
-*   **Driver:** TMC2209 via UART.
-*   **Electronics:** BigTreeTech EBB36 or SB2209 (CAN Bus).
+### 2. Extrusion Crash Detection
+Monitors the extruder motor for resistance spikes (blobs/tangles). If >3 spikes occur in one layer, the printer slows to 50% speed for 3 layers to recover.
 
-*If you use standard NEMA 17 motors or different drivers, you will need to adjust the `sensor_baseline` and `noise_filter` significantly.*
+### 3. Smart Cornering ("Sticky Heat")
+Prevents "Bulging Corners". The script heats up instantly but cools down *slowly*, ensuring plastic remains fluid during corner braking.
+
+### 4. Dynamic Pressure Advance
+Automatically **lowers** Pressure Advance (PA) as the temperature rises, preventing gaps in corners.
 
 ---
 
