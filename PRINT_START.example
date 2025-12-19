@@ -1,86 +1,35 @@
 [gcode_macro PRINT_START]
 gcode:
-    # -----------------------------------------------------------
-    # 1. Get Parameters
-    # -----------------------------------------------------------
+    # 1. Get Params
+    {% set target_bed      = params.BED|default(60)|int %}
     {% set target_extruder = params.EXTRUDER|default(200)|int %}
     {% set material        = params.MATERIAL|default("PLA")|string %}
-
-    # -----------------------------------------------------------
-    # 2. Reset Auto-Flow State (REQUIRED at top of macro)
-    # -----------------------------------------------------------
+    
+    # 2. Reset
     AT_RESET_STATE
     AT_DISABLE
 
-    # -----------------------------------------------------------
-    # 3. Define Material Configs
-    # -----------------------------------------------------------
-    # Initialize Defaults
-    {% set load_k = 0.0 %}   # Viscosity (TMC) Boost
-    {% set speed_k = 0.0 %}  # Flow (Speed) Boost
-    {% set pa_val = 0.0 %}   # Pressure Advance
-    {% set max_temp_safety = 300 %}
+    # 3. Prepare Machine (Mesh, Home, Heat)
+    M117 Homing...
+    G28
+    G90
 
-    # Logic Block
-    {% if 'PLA' in material %}
-        {% set load_k = 0.60 %}
-        {% set speed_k = 1.4 %}
-        {% set pa_val = 0.040 %}
-        {% set max_temp_safety = 240 %}
-        
-    {% elif 'PETG' in material %}
-        # --- AGGRESSIVE FLOW TUNING (Safe now due to Flow Gate) ---
-        {% set load_k = 0.80 %}
-        {% set speed_k = 1.20 %}  # Keep this high for the 30mm3/s sprints
-        {% set pa_val = 0.060 %}
-        {% set max_temp_safety = 280 %} # Ensure cap is high enough for the boost
-        
-    {% elif 'ABS' in material or 'ASA' in material %}
-        {% set load_k = 0.20 %}
-        {% set speed_k = 0.80 %}
-        {% set pa_val = 0.050 %}
-        {% set max_temp_safety = 290 %}
-        
-    {% elif 'TPU' in material %}
-        # Disable for flexible filaments
-        {% set load_k = 0.0 %}
-        {% set speed_k = 0.0 %}
-        {% set pa_val = 0.20 %} 
-        {% set max_temp_safety = 240 %}
-    {% endif %}
+    M117 Heating Bed...
+    M140 S{target_bed}
+    TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={target_bed}
 
-    # -----------------------------------------------------------
-    # 4. Your Standard Start Routine
-    # -----------------------------------------------------------
-    # Insert your Homing (G28), Bed Heat, QGL, and Mesh logic here.
-    # ...
-    # ...
-    
-    # Final Heating (Wait for Extruder)
+    M117 Meshing...
+    # (Insert your mesh code here, e.g., BED_MESH_CALIBRATE ADAPTIVE=1)
+
+    M117 Heating Nozzle...
     M109 S{target_extruder}
 
-    # -----------------------------------------------------------
-    # 5. Apply & Enable (MUST happen after heating)
-    # -----------------------------------------------------------
-    
-    # Apply Pressure Advance
-    {% if pa_val > 0 %}
-        SET_PRESSURE_ADVANCE ADVANCE={pa_val}
-    {% endif %}
+    # 4. INITIALIZE ADAPTIVE FLOW (One-Line Magic)
+    AT_INIT_MATERIAL MATERIAL={material}
 
-    # Enable Adaptive Flow
-    {% if load_k > 0 or speed_k > 0 %}
-        AT_SET_VISC_K K={load_k}
-        AT_SET_FLOW_K K={speed_k}
-        AT_SET_MAX MAX={max_temp_safety}
-        AT_ENABLE
-        RESPOND MSG="Adaptive Flow ON: {material}"
-    {% else %}
-        AT_DISABLE
-        RESPOND MSG="Adaptive Flow OFF: {material}"
-    {% endif %}
-
-    # Start Printing...
+    # 5. Print
+    M117 Printing...
+    # (Insert Prime Line code here)
 
 
 [gcode_macro PRINT_END]
