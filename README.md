@@ -182,9 +182,6 @@ Add the following to your `printer.cfg`:
 [gcode_interceptor]
 
 [extruder_monitor]
-# IMPORTANT: Change this to match your actual driver section!
-# Examples: "tmc2209 extruder" or "tmc2209 stepper_e" or "tmc5160 extruder"
-driver_name: tmc2209 extruder
 
 [save_variables]
 filename: ~/printer_data/config/adaptive_flow_vars.cfg
@@ -195,15 +192,6 @@ filename: ~/printer_data/config/adaptive_flow_vars.cfg
 [temperature_sensor Toolhead_Temp]
 sensor_type: temperature_mcu
 sensor_mcu: EBBCan
-```
-
-**TMC Driver Configuration:**
-In your TMC section, ensure StallGuard is enabled:
-```ini
-[tmc2209 extruder]
-run_current: 0.650
-stealthchop_threshold: 0
-driver_SGTHRS: 120
 ```
 
 **Extruder Configuration:**
@@ -256,28 +244,7 @@ gcode:
 
 All settings are located at the **top** of `auto_flow.cfg` in the USER CONFIGURATION block.
 
-### Step 1: Install TMC Autotune (Required)
-
-> ⚠️ **This step is required.** NEMA 14 "Pancake" motors (LDO-36STH20) have very low inductance. Without TMC Autotune, StallGuard will report "0" load and Adaptive Flow cannot function.
-
-**Install Klipper TMC Autotune:**
-
-```bash
-cd ~
-wget https://raw.githubusercontent.com/andrewmcgr/klipper_tmc_autotune/main/install.sh
-bash install.sh
-```
-
-**Add to `printer.cfg`:**
-```ini
-[autotune_tmc extruder]
-motor: ldo-36sth20-1004ahg
-tuning_goal: performance
-```
-
-Restart Klipper: `sudo systemctl restart klipper`
-
-### Step 2: Select Nozzle Type
+### Select Nozzle Type
 
 Edit `auto_flow.cfg`:
 - **Revo High Flow:** `variable_use_high_flow_nozzle: True`
@@ -323,14 +290,6 @@ Set your slicer to normal quality temperatures. The script boosts automatically 
 
 When using `AT_START`, several automatic systems handle configuration:
 
-### Auto-Baseline Calibration
-
-If no saved baseline exists, the system calibrates during the first print:
-```
-AUTO-CALIBRATION: Sampling baseline... (no saved value found)
-AUTO-CALIBRATION: Baseline set to 16 (from 20 samples)
-```
-
 ### Temperature-Based Material Detection
 
 `AT_START` infers material from slicer temperature:
@@ -365,12 +324,10 @@ The system monitors thermal response and adjusts:
 | `AT_DISABLE` | Manually disable adaptive flow |
 | `AT_STATUS` | Display current status and all settings |
 
-### Calibration Commands
+### PA Commands
 
 | Command | Description |
 |---------|-------------|
-| `AT_AUTO_CALIBRATE TEMP=220` | Automatic baseline calibration |
-| `AT_CHECK_BASELINE TEMP=220` | Manual baseline check |
 | `AT_SET_PA MATERIAL=PLA PA=0.045` | Save calibrated PA value |
 | `AT_GET_PA MATERIAL=PLA` | Show PA for material |
 | `AT_LIST_PA` | List all PA values |
@@ -385,7 +342,6 @@ The system monitors thermal response and adjusts:
 
 | Command | Description |
 |---------|-------------|
-| `GET_EXTRUDER_LOAD` | Current TMC StallGuard value |
 | `GET_PREDICTED_LOAD` | Predicted extrusion rate from lookahead |
 | `SET_LOOKAHEAD E=2.5 D=0.5` | Manually add lookahead segment |
 | `SET_LOOKAHEAD CLEAR` | Clear lookahead buffer |
@@ -396,11 +352,10 @@ The system monitors thermal response and adjusts:
 
 | Issue | Solution |
 |-------|----------|
-| "Driver not found" error | Verify `driver_name` matches your TMC config section exactly |
 | Lookahead not working | Check logs for "intercepting G-code" message |
-| Load always 0 | Install TMC Autotune; pancake motors need tuning |
 | Erratic temperature | Lower lookahead boost multiplier or increase smoothing |
 | Thermal warnings | Check heater wattage vs flow rate demands |
+| No temperature boost | Verify flow exceeds 2mm³/s (std) or 3mm³/s (HF) |
 
 ---
 
@@ -408,16 +363,14 @@ The system monitors thermal response and adjusts:
 
 | File | Purpose |
 |------|---------|
-| `gcode_interceptor.py` | Klipper module — intercepts G-code and broadcasts to subscribers |
-| `extruder_monitor.py` | Klipper module — TMC load reading + live lookahead parsing |
-| `auto_flow.cfg` | Macros for adaptive temp, PA, blob detection, and lookahead boost |
+| `extruder_monitor.py` | Klipper module — G-code lookahead parsing and flow prediction |
+| `auto_flow.cfg` | Macros for adaptive temp, PA, and lookahead boost |
 
 ---
 
 ## Compatibility
 
 - **Hotend:** E3D Revo only (Revo HF or Revo Standard)
-- **TMC Driver:** Requires StallGuard support (TMC2209, TMC2130, TMC5160)
 - **Extrusion Mode:** Supports both absolute (M82) and relative (M83)
 - **Platform:** Tested on Klipper with Raspberry Pi
 - **Interfaces:** Works with Mainsail, Fluidd, and OctoPrint
