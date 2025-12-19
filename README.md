@@ -223,10 +223,10 @@ To ensure the script works within safe physical limits, set the **Max Volumetric
 
 This script functions by commanding a **Temperature Spike** during high-speed moves. For this to work, your heater must have **"Headroom"** (unused power capacity). If your heater is already running at 100% power just to maintain the base temperature, the script cannot add more heat, and the temperature will drop.
 
-### The Revo Benchmark (PETG / 0.4mm Nozzle)
+### The Benchmark (Revo High Flow Nozzle + PETG)
 
 *   **Scenario A: 40W HeaterCore**
-    *   At **~26 mm³/s**, the 40W heater hits 100% Duty Cycle.
+    *   Using a High Flow nozzle, the 40W heater hits 100% Duty Cycle at **~26 mm³/s**.
     *   **Result:** The script attempts to boost the temperature, but the heater physically cannot supply more energy.
     *   **Hard Limit:** 26 mm³/s.
 
@@ -236,4 +236,4 @@ This script functions by commanding a **Temperature Spike** during high-speed mo
     *   **New Limit:** ~32+ mm³/s.
 
 **Conclusion:**
-To reliably print above **26 mm³/s** with this system, the **60W HeaterCore** is mandatory. The 40W core simply lacks the overhead required for dynamic temperature boosting at those flow rates.
+To reliably print above **26 mm³/s** with a High Flow nozzle, the **60W HeaterCore** is mandatory. The 40W core simply lacks the overhead required for dynamic temperature boosting at those flow rates.
