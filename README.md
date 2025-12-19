@@ -1,10 +1,10 @@
 # Klipper Adaptive Flow
 
-**A closed-loop flow control and artifact detection system for Klipper.**
+**A closed-loop flow control system for Klipper using G-code lookahead and live velocity data.**
 
-This system uses TMC driver feedback to actively manage temperature, pressure advance, and print speed. It is specifically tuned for **E3D Revo** hotends using **Voron/Sherpa** style extruders.
+This system dynamically adjusts nozzle temperature based on real-time extrusion flow rate and upcoming G-code moves. It is specifically tuned for **E3D Revo** hotends.
 
-> **Hardware:** Designed for **E3D Revo hotends** (HF and Standard) with **TMC drivers** (2209/2240/5160)
+> **Zero TMC/StallGuard required** — Works with any printer using Klipper's native velocity tracking and G-code parsing.
 
 ---
 
@@ -12,13 +12,13 @@ This system uses TMC driver feedback to actively manage temperature, pressure ad
 
 **The Problem:** Standard 3D printing uses a fixed hotend temperature. But filament viscosity and required melt energy change constantly based on:
 - How fast you're extruding (infill vs perimeters vs small details)
-- How much back-pressure the nozzle creates under load
 - Upcoming flow changes the slicer has planned
+- Acceleration and deceleration phases
 
 Running too cold = under-extrusion, weak layer adhesion, clogs.  
 Running too hot = stringing, oozing, heat creep, burned filament.
 
-**The Solution:** This system monitors real-time extruder load via TMC StallGuard and looks ahead at upcoming G-code to **dynamically adjust temperature** — hotter for high-flow sections, cooler during travel moves.
+**The Solution:** This system monitors real-time extrusion velocity and looks ahead at upcoming G-code to **dynamically adjust temperature** — hotter for high-flow sections, cooler for fine details.
 
 ### What You Get
 
@@ -26,7 +26,7 @@ Running too hot = stringing, oozing, heat creep, burned filament.
 |---------|--------------|
 | **Better print quality** | Temperature matched to actual flow demand reduces under-extrusion and stringing |
 | **Faster prints** | Push higher flow rates without quality loss — the system compensates automatically |
-| **Zero configuration** | Auto-calibrates on first print, detects material from temp, learns optimal settings |
+| **Zero configuration** | Detects material from temp, sets optimal K-values automatically |
 | **Set and forget** | Just add `AT_START` to your slicer — no per-print tuning needed |
 | **Works with any slicer** | Temperature-based material detection means no slicer plugins required |
 | **Self-improving** | K-values automatically tune themselves based on your printer's thermal response |
@@ -34,30 +34,28 @@ Running too hot = stringing, oozing, heat creep, burned filament.
 ### Who Is This For?
 
 - ✅ You have an **E3D Revo** hotend (HF or Standard)
-- ✅ You use **TMC stepper drivers** with StallGuard capability
-- ✅ You want **Bambu-style automatic calibration** on your Klipper printer
+- ✅ You want **Bambu-style automatic temperature control** on your Klipper printer
 - ✅ You print a variety of materials and want consistent quality without manual tuning
 - ✅ You push high flow rates and fight under-extrusion at speed
 
 ### Who Is This NOT For?
 
 - ❌ Non-Revo hotends (different thermal mass = different K-values needed)
-- ❌ Non-TMC drivers (no StallGuard = no load sensing)
 - ❌ Users who prefer fully manual control
 
 ---
 
 ## ⚠️ Hardware Requirements
 
-This script is tuned for the following hardware ecosystem:
+This script is tuned for the following hardware:
 
 | Component | Supported Options |
 |-----------|-------------------|
 | **Hotend** | E3D Revo (Standard or High Flow nozzle) |
 | **HeaterCore** | 40W (Standard) or 60W (High Speed/High Flow) |
-| **Extruder** | Voron StealthBurner (CW2), Sherpa Mini, or Orbiter |
-| **Motor** | NEMA 14 Pancake (LDO-36STH20 or Generic) |
-| **Electronics** | BTT EBB36 / SB2209 (CAN Bus) or similar with TMC2209 |
+| **Extruder** | Voron StealthBurner (CW2), Sherpa Mini, Orbiter, or similar |
+
+**No TMC/StallGuard requirement** — The system uses Klipper's live velocity data and G-code lookahead, not motor load sensing.
 
 ---
 
@@ -74,10 +72,9 @@ This script is tuned for the following hardware ecosystem:
    ```gcode
    AT_END
    ```
-4. **Print!** — No manual calibration required.
+4. **Print!** — No calibration required.
 
 The system will automatically:
-- **Auto-calibrate** baseline during your first print's extrusion
 - **Detect material** from your slicer's temperature setting
 - **Apply optimal K-values** and pressure advance for that material
 - **Self-learn** over time, adjusting K-values based on thermal response
@@ -91,9 +88,9 @@ That's it. No `AT_INIT_MATERIAL`, no calibration wizards, no manual baseline set
 ### 1. Revo-Optimized Temp Boosting
 Automatically raises the temperature as flow rate increases.
 - **Predictive Acceleration:** Detects rapid speed changes and "kicks" the heater to overcome thermal lag.
-- **Flow Gates:** Automatically ignores slow moves to prevent oozing.
-  - **Standard Nozzle:** Boosts start > 8mm³/s.
-  - **High Flow Nozzle:** Boosts start > 15mm³/s.
+- **Flow Gates:** Ignores very slow moves to prevent unnecessary heating.
+  - **Standard Nozzle:** Boosts start > 2mm³/s.
+  - **High Flow Nozzle:** Boosts start > 3mm³/s.
 
 ### 2. Burst Protection (Noise Filtering)
 High-speed printing often involves tiny, rapid movements like **Gap Infill**.
@@ -103,28 +100,25 @@ High-speed printing often involves tiny, rapid movements like **Gap Infill**.
   - Short bursts (< 0.5s) are smoothed out and ignored.
   - This ensures the heater only reacts to moves long enough to benefit from the extra energy.
 
-### 3. Extrusion Crash Detection
-Monitors the extruder motor for resistance spikes (blobs/tangles). If >3 spikes occur in one layer, the printer slows to 50% speed for 3 layers to recover.
-
-### 4. Smart Cornering ("Sticky Heat")
+### 3. Smart Cornering ("Sticky Heat")
 High-speed printing often suffers from **Bulging Corners**. This happens because when the print head brakes for a corner, the pressure in the nozzle doesn't drop instantly.
 - **The Problem:** Standard logic cools the nozzle when speed drops. Cooler plastic = Higher Viscosity = More Bulging.
 - **The Fix:** This script uses **Asymmetric Smoothing**. It heats up *instantly* to match acceleration but cools down *very slowly*. This keeps the plastic fluid during corner braking, allowing the extruder to relieve pressure effectively.
 
-### 5. Dynamic Pressure Advance
+### 4. Dynamic Pressure Advance
 Works in tandem with Smart Cornering. As the temperature boosts, the plastic becomes more fluid (lower viscosity).
 - **The Logic:** Hotter plastic requires **less** Pressure Advance to control.
 - **The Action:** The script automatically **lowers** your PA value as the temperature rises. This prevents the "gaps" or "shredded corners" that occur when you apply high-speed PA values to super-heated plastic.
 
-### 6. Live G-code Lookahead
+### 5. Live G-code Lookahead
 The system parses upcoming G-code moves to predict flow changes *before* they happen.
 - **Proactive Boosting:** Raises temperature before high-flow sections arrive
 - **Smoother Transitions:** Eliminates under-extrusion at flow ramp-ups
 
-### 7. Thermal Safety
+### 6. Thermal Safety
 Built-in runaway protection with emergency shutdown if temperature exceeds safe limits.
 
-### 8. Self-Learning K-Values
+### 7. Self-Learning K-Values
 The system monitors thermal response and gradually optimizes boost aggressiveness over time.
 
 ---
