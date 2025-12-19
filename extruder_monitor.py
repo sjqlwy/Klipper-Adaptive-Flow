@@ -45,39 +45,60 @@ class ExtruderMonitor:
         gcode.register_command("GET_PREDICTED_LOAD", self.cmd_GET_PREDICTED_LOAD,
                                desc="Get predicted extrusion rate and estimated load using lookahead")
 
-        # Attempt to attach a live G-code listener. Klipper exposes different
-        # event registration APIs across versions; try a few common ones and
-        # fail gracefully if not available.
+        # Attempt to attach a live G-code listener using multiple methods
         hook_installed = False
+        
+        # Method 1: Use gcode_interceptor module (preferred - most reliable)
         try:
-            # preferred: gcode.register_event_handler(event_name, callback)
-            if hasattr(gcode, 'register_event_handler'):
-                try:
-                    gcode.register_event_handler('gcode:received', self._on_gcode_event)
-                    hook_installed = True
-                except Exception:
-                    # try without namespace
+            interceptor = self.printer.lookup_object('gcode_interceptor')
+            interceptor.register_gcode_callback(self._on_gcode_line)
+            hook_installed = True
+            logging.getLogger('ExtruderMonitor').info(
+                'Live G-code lookahead hook installed via gcode_interceptor.')
+        except Exception:
+            pass
+
+        # Method 2: Fallback - try legacy event APIs
+        if not hook_installed:
+            try:
+                if hasattr(gcode, 'register_event_handler'):
                     try:
-                        gcode.register_event_handler('received', self._on_gcode_event)
+                        gcode.register_event_handler('gcode:received', self._on_gcode_event)
+                        hook_installed = True
+                    except Exception:
+                        try:
+                            gcode.register_event_handler('received', self._on_gcode_event)
+                            hook_installed = True
+                        except Exception:
+                            pass
+
+                if not hook_installed and hasattr(self.printer, 'register_event_handler'):
+                    try:
+                        self.printer.register_event_handler('gcode:received', self._on_gcode_event)
                         hook_installed = True
                     except Exception:
                         pass
+            except Exception:
+                pass
 
-            # alternate: printer-level event
-            if not hook_installed and hasattr(self.printer, 'register_event_handler'):
-                try:
-                    self.printer.register_event_handler('gcode:received', self._on_gcode_event)
-                    hook_installed = True
-                except Exception:
-                    pass
-        except Exception:
-            hook_installed = False
+            if hook_installed:
+                logging.getLogger('ExtruderMonitor').info(
+                    'Live G-code lookahead hook installed via legacy event API.')
 
         if not hook_installed:
-            logging.getLogger('ExtruderMonitor').info('Live G-code lookahead hook not installed (API unavailable).')
-        else:
-            logging.getLogger('ExtruderMonitor').info('Live G-code lookahead hook installed.')
+            logging.getLogger('ExtruderMonitor').warning(
+                'Live G-code lookahead hook not installed. '
+                'Add [gcode_interceptor] to printer.cfg for automatic lookahead.')
 
+    def _on_gcode_line(self, line):
+        """Simple callback for gcode_interceptor - receives raw G-code line."""
+        if not line:
+            return
+        up = line.upper().strip()
+        if not (up.startswith('G0') or up.startswith('G1')):
+            return
+        # Delegate to the existing parser logic
+        self._parse_gcode_move(line)
 
     # Public lookahead API (can be called from other modules)
     def add_lookahead_segment(self, e_delta_mm, duration_s):
@@ -139,7 +160,10 @@ class ExtruderMonitor:
         if not (up.startswith('G0') or up.startswith('G1')):
             return
 
-        # parse parameters (simple regex)
+        self._parse_gcode_move(line)
+
+    def _parse_gcode_move(self, line):
+        """Parse a G0/G1 move and add to lookahead if it contains extrusion."""
         import re
         param_re = re.compile(r'([A-Za-z])([-+]?[0-9]*\.?[0-9]+)')
         params = {}
@@ -205,12 +229,21 @@ class ExtruderMonitor:
 
     def _predicted_extrusion_rate(self):
         """Return predicted extrusion rate in mm/s computed from current lookahead."""
+        # Expire stale entries older than 2 seconds
+        now = time.time()
+        max_age = 2.0
         with self._lookahead_lock:
+            # Remove expired entries from the front of the deque
+            while self._lookahead and (now - self._lookahead[0][2]) > max_age:
+                self._lookahead.popleft()
+            
             total_e = 0.0
             total_t = 0.0
-            for e, d, _ in self._lookahead:
-                total_e += abs(e)
-                total_t += max(1e-6, float(d))
+            for e, d, ts in self._lookahead:
+                # Only consider entries within the time window
+                if (now - ts) <= max_age:
+                    total_e += abs(e)
+                    total_t += max(1e-6, float(d))
         if total_t <= 0:
             return 0.0
         return total_e / total_t
