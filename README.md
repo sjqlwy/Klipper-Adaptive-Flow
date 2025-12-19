@@ -210,7 +210,7 @@ To ensure the script works within safe physical limits, set the **Max Volumetric
 
 | Heater Core | Nozzle Type | Recommended Slicer Limit | Bottleneck |
 | :--- | :--- | :--- | :--- |
-| **40W** | Standard (Brass) | **18 mm³/s** | Melt Zone Geometry |
+| **40W** | Standard (Brass) | **17 mm³/s** | Melt Zone Geometry |
 | **60W** | Standard (Brass) | **20 mm³/s** | Melt Zone Geometry |
 | **40W** | **High Flow (HF)** | **24 mm³/s** | Heater Power (Watts) |
 | **60W** | **High Flow (HF)** | **32 mm³/s** | *Maximum Performance* |
