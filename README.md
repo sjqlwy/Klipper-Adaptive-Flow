@@ -293,68 +293,42 @@ Restart Klipper: `sudo systemctl restart klipper`
 ### Step 2: Select Nozzle Type
 
 Edit `auto_flow.cfg`:
-
-- **Revo High Flow (HF):** `variable_use_high_flow_nozzle: True` (gate at 15mm³/s)
-- **Revo Standard (Brass/ObX):** `variable_use_high_flow_nozzle: False` (gate at 8mm³/s)
-
----
-
-## 🌡️ Recommended Base Temperatures
-
-When using this script, set your slicer temperature to a standard **"Quality"** temperature. **Do not** set a high-speed temperature — the script will boost on top of your base.
-
-| Material | Slicer Base Temp | Max Safety Cap | Notes |
-|----------|------------------|----------------|-------|
-| **PLA** | **210°C** | 235°C | Best balance of cooling vs flow |
-| **PETG** | **240-245°C** | 275°C | 245°C ensures good layer bond at low speeds |
-| **ABS/ASA** | **250°C** | 290°C | Needs heat. Boost takes it to ~275°C |
-| **PC/Nylon** | **270°C** | 300°C | ⚠️ Revo max is 300°C |
-| **TPU** | **230°C** | 240°C | Auto-Flow usually disabled to prevent foaming |
-
-> **Note:** If your filament says "210-230°C", pick the **highest number (230°C)** as your base. High-speed printing reduces heat absorption time.
+- **Revo High Flow:** `variable_use_high_flow_nozzle: True`
+- **Revo Standard:** `variable_use_high_flow_nozzle: False`
 
 ---
 
 ## ✂️ Slicer Configuration
 
-### 1. Pressure Advance (Critical)
+### Pressure Advance — Disable It
 
-**Disable Pressure Advance in your slicer.**
-- **Orca Slicer:** Set "Pressure Advance" to `0` in Filament Settings
-- **PrusaSlicer:** Remove any `M572` or `SET_PRESSURE_ADVANCE` commands
+The script manages PA dynamically. **Set PA to 0 in your slicer.**
 
-The script manages PA dynamically. Set your calibrated values with:
+Store your calibrated values in Klipper instead:
 ```gcode
 AT_SET_PA MATERIAL=PLA PA=0.045
 ```
 
-### 2. Max Volumetric Speed (Safety Caps)
+### Temperatures — Use "Quality" Settings
 
-Set **Max Volumetric Speed** in your slicer based on your hardware:
+Set your slicer to normal quality temperatures. The script boosts automatically during high-speed moves.
 
-| Heater Core | Nozzle Type | Recommended Limit | Bottleneck |
-|-------------|-------------|-------------------|------------|
-| **40W** | Standard (Brass) | **17 mm³/s** | Melt Zone Geometry |
-| **60W** | Standard (Brass) | **20 mm³/s** | Melt Zone Geometry |
-| **40W** | **High Flow (HF)** | **24 mm³/s** | Heater Power |
-| **60W** | **High Flow (HF)** | **32 mm³/s** | *Maximum Performance* |
+| Material | Slicer Temp | Script Boosts To |
+|----------|-------------|------------------|
+| PLA | 210°C | up to 235°C |
+| PETG | 245°C | up to 275°C |
+| ABS/ASA | 250°C | up to 290°C |
 
-*These values exceed official E3D ratings because Adaptive Flow actively manages thermal limitations.*
+### Max Volumetric Speed
 
----
+| Setup | Slicer Limit |
+|-------|--------------|
+| 40W + Standard Nozzle | 17 mm³/s |
+| 60W + Standard Nozzle | 20 mm³/s |
+| 40W + High Flow | 24 mm³/s |
+| 60W + High Flow | 32 mm³/s |
 
-## 📊 Hardware Limits: 40W vs 60W
-
-This script works by commanding **Temperature Spikes** during high-speed moves. Your heater must have **headroom** (unused power capacity).
-
-### The Benchmark (Revo HF + PETG)
-
-| HeaterCore | At 26mm³/s | Result |
-|------------|------------|--------|
-| **40W** | 100% Duty Cycle | Script can't boost — **Hard limit: 26mm³/s** |
-| **60W** | ~70% Duty Cycle | Reserve power for boosts — **32+ mm³/s possible** |
-
-**Conclusion:** To reliably print above **26 mm³/s** with High Flow, the **60W HeaterCore** is mandatory.
+> **Note:** For speeds above 26 mm³/s, the 60W HeaterCore is required — the 40W runs at 100% duty cycle and has no headroom for temperature boosts.
 
 ---
 
