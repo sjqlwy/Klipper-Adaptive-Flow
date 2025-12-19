@@ -290,25 +290,7 @@ tuning_goal: performance
 
 Restart Klipper: `sudo systemctl restart klipper`
 
-### Step 2: Calibrate Motor Baseline
-
-The baseline is the StallGuard reading at "zero load" (extruding freely into air).
-
-**Automatic Calibration (Recommended):**
-```gcode
-AT_AUTO_CALIBRATE TEMP=220 LENGTH=50 SAMPLES=10
-```
-
-**Manual Calibration:**
-1. Heat nozzle to printing temp
-2. Unload filament or lift Z high
-3. Run: `AT_CHECK_BASELINE`
-4. Note the Extruder Load number:
-   - **Pancake Motors (LDO/Orbiter/Sherpa):** Expect **12 - 20**
-   - **Standard NEMA 17:** Expect **60 - 100**
-5. Save: `SAVE_VARIABLE VARIABLE=sensor_baseline VALUE=16`
-
-### Step 3: Select Nozzle Type
+### Step 2: Select Nozzle Type
 
 Edit `auto_flow.cfg`:
 
