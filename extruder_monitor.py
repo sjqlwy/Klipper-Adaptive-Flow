@@ -308,19 +308,32 @@ class ExtruderMonitor:
         return total_e / total_t
 
     def _read_current_load(self):
+        """Read StallGuard result from TMC driver.
+        
+        TMC2209: SG_RESULT is embedded in DRV_STATUS register (bits 0-9)
+        TMC2130/TMC5160: Have dedicated SG_RESULT register
+        """
         try:
             if hasattr(self, 'tmc'):
                 mcu_tmc = self.tmc.mcu_tmc
-                val = mcu_tmc.get_register('SG_RESULT')
-                if not isinstance(val, int):
-                    val = int(val)
-                return int(val)
+                # Try DRV_STATUS first (works for TMC2209/TMC2226)
+                # SG_RESULT is bits 0-9 of DRV_STATUS
+                try:
+                    drv_status = mcu_tmc.get_register('DRV_STATUS')
+                    val = drv_status & 0x3FF  # Extract bits 0-9
+                    return int(val)
+                except Exception:
+                    pass
+                # Fallback: try dedicated SG_RESULT register (TMC2130/TMC5160)
+                try:
+                    val = mcu_tmc.get_register('SG_RESULT')
+                    if not isinstance(val, int):
+                        val = int(val)
+                    return int(val)
+                except Exception:
+                    pass
         except Exception:
-            try:
-                val = self.tmc.get_register('SG_RESULT')
-                return int(val)
-            except Exception:
-                pass
+            pass
         return -1
 
     def cmd_SET_LOOKAHEAD(self, gcmd):
