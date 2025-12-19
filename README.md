@@ -91,7 +91,7 @@ max_extrude_only_distance: 101.0
    
 ### Step 4: Start Macro <br/>
 Adapt your PRINT_START from my example. 
-<br/>This handles the sensitivity tuning for different materials automatically.
+<br/>.
 
 
 
