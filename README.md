@@ -25,23 +25,26 @@ Automatically raises the temperature as flow rate increases.
     *   **Standard Nozzle:** Boosts start > 8mm³/s.
     *   **High Flow Nozzle:** Boosts start > 15mm³/s.
 
-### 2. Burst Protection (New)
-Uses a rolling average to filter out short speed spikes (like gap infill). This prevents the heater from reacting to movements that are too short to matter, ensuring stability.
-
+### 2. Burst Protection (Noise Filtering)
+High-speed printing often involves tiny, rapid movements like **Gap Infill** or **Small Text**.
+*   **The Problem:** Without filtering, the script sees a 0.1-second spike to 300mm/s and immediately commands a +20°C boost. Since the move is over before the heater can react, the nozzle just overheats while idle.
+*   **The Solution:** The script applies a **Rolling Weighted Average** to the flow calculation.
+    *   Sustained speed (long walls/infill) triggers the full boost.
+    *   Short bursts (< 0.5s) are smoothed out and ignored.
+    *   This ensures the heater only reacts to moves long enough to benefit from the extra energy.
+    *   
 ### 3. Extrusion Crash Detection
 Monitors the extruder motor for resistance spikes (blobs/tangles). If >3 spikes occur in one layer, the printer slows to 50% speed for 3 layers to recover.
 
 ### 4. Smart Cornering ("Sticky Heat")
-High-speed printing often suffers from **Bulging Corners**. This happens because when the print head brakes for a corner, the pressure in the nozzle doesn't drop instantly, causing extra plastic to ooze out at the sharp turn.
+High-speed printing often suffers from **Bulging Corners**. This happens because when the print head brakes for a corner, the pressure in the nozzle doesn't drop instantly.
+*   **The Problem:** Standard logic cools the nozzle when speed drops. Cooler plastic = Higher Viscosity = More Bulging.
+*   **The Fix:** This script uses **Asymmetric Smoothing**. It heats up *instantly* to match acceleration but cools down *very slowly*. This keeps the plastic fluid during corner braking, allowing the extruder to relieve pressure effectively.
 
-Standard flow compensation attempts to fix this by lowering temperature when speed drops, but this actually makes it **worse**:
-*   *Cooler plastic = Higher Viscosity = More Back-Pressure = More Bulging.*
-
-**The Solution:** This script uses an asymmetric smoothing filter.
-*   **Acceleration (Heating):** The temperature rises **instantly** (Feed-Forward) to match the speed increase.
-*   **Deceleration (Cooling):** The temperature drops **very slowly** (Linear Decay).
-    *   This keeps the nozzle hot and the plastic fluid during the braking maneuver.
-    *   The lower viscosity allows the Pressure Advance system to retract filament efficiently, resulting in sharp, clean corners without the bulge.
+### 5. Dynamic Pressure Advance
+Works in tandem with Smart Cornering. As the temperature boosts, the plastic becomes more fluid (lower viscosity).
+*   **The Logic:** Hotter plastic requires **less** Pressure Advance to control.
+*   **The Action:** The script automatically **lowers** your PA value as the temperature rises. This prevents the "gaps" or "shredded corners" that occur when you apply high-speed PA values to super-heated plastic.
 ---
 
 
