@@ -1,43 +1,98 @@
-Adaptive Flow — Live G-code Lookahead
-=====================================
+# Klipper Adaptive Flow — Lookahead Branch
 
-This repository provides an adaptive temperature/flow monitor and a live
-G-code lookahead feature for Klipper-based printers. The key goal is to
-predict upcoming extrusion demand so `auto_flow.cfg` can apply better
-temperature/flow adjustments.
+This branch adds **live G-code lookahead** to the Adaptive Flow system, enabling predictive temperature and pressure advance adjustments based on upcoming extrusion moves.
 
-Files to keep
--------------
-- `extruder_monitor.py` — core Klipper module (lookahead, SG reads, G-code commands).
-- `auto_flow.cfg` — main adaptive flow macros (now includes lookahead macros).
+## What's New in This Branch
 
-Optional/support files
-----------------------
-(none)
+The `lookahead-feature` branch extends the original Adaptive Flow with:
 
-Install / Deploy (host running Klipper)
---------------------------------------
-1. Copy `extruder_monitor.py` to the Klipper extras directory on the machine running Klipper (e.g., Raspberry Pi). Common locations:
-   - If you installed Klipper from source: `~/klipper/klippy/extras/`
-   - If using an OS-packaged install, consult your Klipper installation layout.
+| Feature | Description |
+|---------|-------------|
+| **Live G-code parsing** | `extruder_monitor.py` intercepts incoming `G0/G1` commands in real-time |
+| **Lookahead buffer** | Stores upcoming extrusion segments (E delta + duration) |
+| **Predicted extrusion rate** | Calculates expected mm/s based on buffered moves |
+| **Proactive temp boost** | Raises temperature *before* high-flow sections arrive |
+| **Smoother transitions** | Reduces under-extrusion at flow ramp-ups |
 
-   Example (from printer host):
+## How It Works
+
+```
+G-code Stream → extruder_monitor.py → Lookahead Buffer
+                                            ↓
+                            predicted_extrusion_rate (mm/s)
+                                            ↓
+                     auto_flow.cfg → lookahead_boost → M104 / PA adjust
+```
+
+1. As G-code streams to Klipper, `extruder_monitor.py` parses `G0/G1` moves
+2. It calculates upcoming extrusion demand and stores it in a buffer
+3. Every 1 second, `auto_flow.cfg` reads `predicted_extrusion_rate`
+4. If upcoming flow > current flow, it applies a **lookahead boost** to temperature
+5. Temperature ramps *before* the high-flow section, not after
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `extruder_monitor.py` | Klipper module — TMC load reading + live lookahead |
+| `auto_flow.cfg` | Macros for adaptive temp, PA, blob detection, and lookahead boost |
+
+## Installation
+
+1. Copy `extruder_monitor.py` to Klipper extras:
    ```bash
-   mkdir -p ~/klipper/klippy/extras
-   cp /path/to/repo/extruder_monitor.py ~/klipper/klippy/extras/
+   cp extruder_monitor.py ~/klipper/klippy/extras/
    ```
 
-2. Restart Klipper service so it loads the new module:
+2. Add `auto_flow.cfg` to your config:
+   ```ini
+   [include auto_flow.cfg]
+   ```
+
+3. Restart Klipper:
    ```bash
    sudo service klipper restart
    ```
-   or use the restart command relevant to your system.
 
-3. Ensure `auto_flow.cfg` (or the macros you prefer) are included in your `printer.cfg`.
-   - Either copy the contents of `auto_flow.cfg` into your main `printer.cfg`, or add an `include` directive if your setup supports it:
-     ```ini
-     include auto_flow.cfg
-     ```
-   - The file already includes `AUTO_LOOKAHEAD` macros and instructions.
+4. Check logs for:
+   ```
+   Live G-code lookahead hook installed.
+   ```
+
+## Usage
+
+Enable adaptive flow before printing:
+```gcode
+AT_INIT_MATERIAL MATERIAL=PLA
+```
+
+The system will automatically:
+- Monitor extruder load (SG_RESULT)
+- Track live extrusion velocity
+- Parse upcoming G-code for lookahead
+- Adjust temperature and pressure advance in real-time
+
+## Tuning
+
+In `auto_flow.cfg`, the lookahead boost multiplier can be adjusted:
+```jinja
+{% set lookahead_boost = lookahead_delta * 0.5 %}  ; 0.5°C per mm³/s
+```
+
+Increase for more aggressive pre-heating, decrease if you see overheating on small prints.
+
+## Compatibility
+
+- Requires TMC driver with StallGuard (e.g., TMC2209)
+- Tested on Klipper with Raspberry Pi
+- Minimal CPU/USB overhead (host-side parsing only)
+
+## Branch Info
+
+| Branch | Description |
+|--------|-------------|
+| `main` | Original Adaptive Flow (reactive only) |
+| `lookahead-feature` | **This branch** — adds predictive lookahead |
+
 
 
