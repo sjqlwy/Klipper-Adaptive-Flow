@@ -1,12 +1,12 @@
 # Klipper Adaptive Flow & Crash Guard (E3D Revo Edition)
 
-**A closed-loop flow control system tuned specifically for the E3D Revo ecosystem.**
+**A closed-loop flow control and artifact detection system for Klipper.**
 
-This system uses TMC driver feedback to actively manage temperature, pressure advance, and print speed. It allows **Revo High Flow** nozzles to push past their rated limits safely, and makes **Standard Revo** nozzles behave like high-flow hotends during fast moves.
+This system uses TMC driver feedback to actively manage temperature, pressure advance, and print speed. It is specifically tuned to overcome the thermal limitations of **E3D Revo** hotends using **Voron/Sherpa** style extruders.
 
 ## ⚠️ Hardware Requirements
 
-This script is **only** tested and verified on the following hardware. Using other hotends (Dragon, Rapido, V6) is **not supported** because the thermal boost curves are calibrated specifically for Revo heater cores.
+This script is tuned for the following hardware ecosystem.
 
 *   **Hotend:** E3D Revo (Standard or High Flow nozzle).
 *   **HeaterCore:** 40W (Standard Speed) or 60W (High Speed/High Flow).
@@ -19,20 +19,24 @@ This script is **only** tested and verified on the following hardware. Using oth
 ## ✨ Features
 
 ### 1. Revo-Optimized Temp Boosting
-Automatically raises the temperature as flow rate increases. The script includes specific "Flow Gates" calculated for Revo geometry:
-*   **Standard Nozzle:** Boosts start at **8mm³/s** (Breaking the 11mm³ limit).
-*   **High Flow Nozzle:** Boosts start at **15mm³/s** (Breaking the 25mm³ limit).
+Automatically raises the temperature as flow rate increases.
+*   **Predictive Acceleration:** Detects rapid speed changes and "kicks" the heater to overcome thermal lag.
+*   **Flow Gates:** Automatically ignores slow moves to prevent oozing.
+    *   **Standard Nozzle:** Boosts start > 8mm³/s.
+    *   **High Flow Nozzle:** Boosts start > 15mm³/s.
 
-### 2. Extrusion Crash Detection
+### 2. Burst Protection (New)
+Uses a rolling average to filter out short speed spikes (like gap infill). This prevents the heater from reacting to movements that are too short to matter, ensuring stability.
+
+### 3. Extrusion Crash Detection
 Monitors the extruder motor for resistance spikes (blobs/tangles). If >3 spikes occur in one layer, the printer slows to 50% speed for 3 layers to recover.
 
-### 3. Smart Cornering ("Sticky Heat")
+### 4. Smart Cornering ("Sticky Heat")
 Prevents "Bulging Corners". The script heats up instantly but cools down *slowly*, ensuring plastic remains fluid during corner braking.
 
-### 4. Dynamic Pressure Advance
-Automatically **lowers** Pressure Advance (PA) as the temperature rises, preventing gaps in corners.
-
 ---
+
+
 
 ## 📦 Installation
 
