@@ -166,6 +166,16 @@ When using this script, set your Slicer temperature to a standard **"Quality"** 
 | **PC / Nylon** | **270°C** | 300°C | **Warning:** Revo max is 300°C. Ensure `max_temp` in config allows this. |
 | **TPU** | **230°C** | 240°C | Auto-Flow is usually disabled for TPU to prevent foaming. |    
 
+> [!NOTE]
+> **Manufacturer Ratings vs. High Speed:**
+> If your filament box says "210-230°C", pick the **highest number (230°C)** as your Base Temp in the slicer.
+>
+> High-speed printing reduces the time the plastic has to absorb heat. Using the lower end of the rating will cause cold-extrusion/delamination on High Flow hotends like the Revo.
+
+
+
+
+
 ## 📊 Hardware Limits: 40W vs 60W
 
 This script functions by commanding a **Temperature Spike** during high-speed moves. For this to work, your heater must have **"Headroom"** (unused power capacity). If your heater is already running at 100% power just to maintain the base temperature, the script cannot add more heat, and the temperature will drop.
