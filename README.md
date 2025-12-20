@@ -128,6 +128,21 @@ Built-in runaway protection with emergency shutdown if temperature exceeds safe 
 ### 7. Self-Learning K-Values
 The system monitors thermal response and gradually optimizes boost aggressiveness over time.
 
+### 8. Automatic PA Learning (Experimental)
+The system learns optimal Pressure Advance values during printing:
+- **Corner Detection:** Monitors sharp corners (>45°) in your print
+- **Thermal Analysis:** Measures temperature deviation after corners
+- **Auto-Adjustment:** Tweaks PA in tiny increments (±0.002) based on thermal feedback
+- **Persistent Storage:** Saves learned PA per material at print end
+
+**How it works:**
+| Thermal Response | Meaning | Action |
+|------------------|---------|--------|
+| Too hot after corner | Over-extrusion (PA too low) | Increase PA |
+| Too cold after corner | Under-extrusion (PA too high) | Decrease PA |
+
+The learning is very conservative — it takes hundreds of corners to make meaningful adjustments. This prevents oscillation while slowly converging on optimal values.
+
 ---
 
 ## 📦 Installation
@@ -317,6 +332,16 @@ The system monitors thermal response and adjusts:
 - **Too hot?** → Decreases `speed_k` to reduce overshoot
 - Learning is conservative (0.05/window) for stability
 
+### PA Auto-Learning
+
+Enable/disable in `auto_flow.cfg`:
+```ini
+variable_pa_auto_learning: True   # Enable corner-based PA learning
+variable_pa_learning_rate: 0.002  # Adjustment per 30 corners
+```
+
+The system detects sharp corners in your print, measures thermal response, and adjusts PA accordingly. Learned values are saved per-material at print end and automatically loaded on subsequent prints.
+
 ---
 
 ## Command Reference
@@ -329,7 +354,7 @@ The system monitors thermal response and adjusts:
 | `AT_END` | Clean shutdown at print end |
 | `AT_ENABLE` | Manually enable adaptive flow |
 | `AT_DISABLE` | Manually disable adaptive flow |
-| `AT_STATUS` | Display current status and all settings |
+| `AT_STATUS` | Display current status and all settings (incl. corner count, PA learning) |
 
 ### PA Commands
 
@@ -389,8 +414,8 @@ The community defaults file is located at:
 
 | File | Purpose |
 |------|---------|
-| `extruder_monitor.py` | Klipper module — G-code lookahead, flow prediction, community defaults fetch |
-| `auto_flow.cfg` | Macros for adaptive temp, PA, and lookahead boost |
+| `extruder_monitor.py` | Klipper module — G-code lookahead, flow prediction, corner detection, community defaults fetch |
+| `auto_flow.cfg` | Macros for adaptive temp, PA, PA auto-learning, and lookahead boost |
 | `community_defaults.json` | Community-curated material settings (hosted on GitHub) |
 
 ---
