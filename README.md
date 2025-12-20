@@ -102,6 +102,8 @@ All other settings auto-configure based on material detection.
 | 180-220°C | PLA |
 | <180°C | TPU |
 
+📄 **[Materials & Temperature Guide](docs/materials-temperature.md)** — Flow gates, K-values, thermal behavior, and safety
+
 ---
 
 ## Commands
