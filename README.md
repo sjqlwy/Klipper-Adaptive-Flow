@@ -36,17 +36,40 @@ Add to your `printer.cfg`:
 
 ## Usage
 
+### Option 1: Direct (simple)
+
 Add to your **slicer start G-code** (after heating commands):
 ```gcode
 AT_START
 ```
 
-Add to your **slicer end G-code**:
+### Option 2: PRINT_START macro (recommended)
+
+**OrcaSlicer/PrusaSlicer start G-code:**
+```gcode
+PRINT_START BED=[bed_temperature_initial_layer_single] EXTRUDER=[nozzle_temperature_initial_layer]
+```
+
+**In printer.cfg:**
+```ini
+[gcode_macro PRINT_START]
+gcode:
+    {% set BED = params.BED|default(60)|int %}
+    {% set EXTRUDER = params.EXTRUDER|default(200)|int %}
+    
+    G28                      ; Home
+    M190 S{BED}              ; Wait for bed
+    M109 S{EXTRUDER}         ; Wait for hotend
+    
+    AT_START                 ; Enable adaptive flow (AFTER heating!)
+```
+
+**Slicer end G-code:**
 ```gcode
 AT_END
 ```
 
-That's it. The system auto-detects your material from the print temperature.
+Material is auto-detected from the extruder temperature — no need to pass it.
 
 ## Configuration
 
