@@ -5,8 +5,11 @@ Dynamic temperature control for E3D Revo hotends. Boosts temp automatically duri
 ## Install
 
 ```bash
+git clone https://github.com/barnard704344/Klipper-Adaptive-Flow.git
+cd Klipper-Adaptive-Flow
 cp gcode_interceptor.py extruder_monitor.py ~/klipper/klippy/extras/
 cp auto_flow.cfg ~/printer_data/config/
+sudo systemctl restart klipper
 ```
 
 Add to `printer.cfg`:
