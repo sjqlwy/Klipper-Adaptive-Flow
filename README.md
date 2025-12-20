@@ -7,7 +7,7 @@ Automatic temperature control for E3D Revo hotends on Klipper. Dynamically boost
 - **Boosts temperature** when flow rate increases (fast infill, thick lines)
 - **Maintains heat** through corners to prevent bulging
 - **Pre-heats** before high-flow sections using G-code lookahead
-- **Auto-detects material** from your slicer's temperature setting
+- **Monitors heater duty cycle** to prevent requesting more than your heater can deliver
 - **Learns optimal values** over time for your printer
 
 ## Installation
@@ -91,7 +91,8 @@ AT_SET_PA MATERIAL=PLA PA=0.045
 3. Calculates temperature boost: `flow_rate × material_k_value`
 4. Only boosts above material-specific thresholds (flow gates)
 5. Heats fast, cools slow to maintain heat through corners
-6. Self-learns optimal K-values based on thermal response
+6. Watches heater PWM — freezes boost at 95%, reduces at 99%
+7. Self-learns optimal K-values (only when heater isn't saturated)
 
 ## Requirements
 
