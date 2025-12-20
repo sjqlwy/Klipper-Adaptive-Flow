@@ -1,401 +1,141 @@
 # Klipper Adaptive Flow
 
-**A closed-loop flow control system for Klipper using G-code lookahead and live velocity data.**
+**Dynamic temperature control for Klipper using G-code lookahead and live velocity data.**
 
-This system dynamically adjusts nozzle temperature based on real-time extrusion flow rate and upcoming G-code moves. It is specifically tuned for **E3D Revo** hotends.
-
-
+Automatically adjusts nozzle temperature based on real-time extrusion flow — hotter for high-flow sections, cooler for fine details. Tuned for **E3D Revo** hotends.
 
 ---
 
-## Why Use This?
+## Quick Start
 
-**The Problem:** Standard 3D printing uses a fixed hotend temperature. But filament viscosity and required melt energy change constantly based on:
-- How fast you're extruding (infill vs perimeters vs small details)
-- Upcoming flow changes the slicer has planned
-- Acceleration and deceleration phases
+1. **Install files:**
+   ```bash
+   # Clone repository
+   git clone https://github.com/barnard704344/Klipper-Adaptive-Flow.git
+   cd Klipper-Adaptive-Flow
+   
+   # Copy to Klipper
+   cp gcode_interceptor.py extruder_monitor.py ~/klipper/klippy/extras/
+   cp auto_flow.cfg ~/printer_data/config/
+   ```
 
-Running too cold = under-extrusion, weak layer adhesion, clogs.  
-Running too hot = stringing, oozing, heat creep, burned filament.
+2. **Add to `printer.cfg`:**
+   ```ini
+   [include auto_flow.cfg]
+   [gcode_interceptor]
+   [extruder_monitor]
+   ```
 
-**The Solution:** This system monitors real-time extrusion velocity and looks ahead at upcoming G-code to **dynamically adjust temperature** — hotter for high-flow sections, cooler for fine details.
-
-### What You Get
-
-| Benefit | How It Works |
-|---------|--------------|
-| **Better print quality** | Temperature matched to actual flow demand reduces under-extrusion and stringing |
-| **Faster prints** | Push higher flow rates without quality loss — the system compensates automatically |
-| **Zero configuration** | Detects material from temp, sets optimal K-values automatically |
-| **Set and forget** | Just add `AT_START` to your slicer — no per-print tuning needed |
-| **Works with any slicer** | Temperature-based material detection means no slicer plugins required |
-| **Self-improving** | K-values automatically tune themselves based on your printer's thermal response |
-
-### Who Is This For?
-
-- ✅ You have an **E3D Revo** hotend (HF or Standard)
-- ✅ You want **Bambu-style automatic temperature control** on your Klipper printer
-- ✅ You print a variety of materials and want consistent quality without manual tuning
-- ✅ You push high flow rates and fight under-extrusion at speed
-
-### Who Is This NOT For?
-
-- ❌ Non-Revo hotends (different thermal mass = different K-values needed)
-- ❌ Users who prefer fully manual control
-
----
-
-## ⚠️ Hardware Requirements
-
-This script is tuned for the following hardware:
-
-| Component | Supported Options |
-|-----------|-------------------|
-| **Hotend** | E3D Revo (Standard or High Flow nozzle) |
-| **HeaterCore** | 40W (Standard) or 60W (High Speed/High Flow) |
-| **Extruder** | Voron StealthBurner (CW2), Sherpa Mini, Orbiter, or similar |
-
-**No TMC/StallGuard requirement** — The system uses Klipper's live velocity data and G-code lookahead, not motor load sensing.
-
----
-
-## ⚡ Zero-Config Quick Start
-
-**Bambu-style "install and forget" operation:**
-
-1. Install the modules (see [Installation](#-installation))
-2. Add one line to your slicer's start G-code (after heating):
+3. **Add to slicer start G-code** (after heating):
    ```gcode
    AT_START
    ```
-3. Add to your end G-code:
+
+4. **Add to slicer end G-code:**
    ```gcode
    AT_END
    ```
-4. **Print!** — No calibration required.
 
-The system will automatically:
-- **Detect material** from your slicer's temperature setting
-- **Apply optimal K-values** and pressure advance for that material
-- **Self-learn** over time, adjusting K-values based on thermal response
-
-That's it. No `AT_INIT_MATERIAL`, no calibration wizards, no manual baseline setting.
+5. **Restart Klipper and print.** That's it.
 
 ---
 
-## ✨ Features
+## How It Works
 
-### 1. Revo-Optimized Temp Boosting
-Automatically raises the temperature as flow rate increases.
-- **Predictive Acceleration:** Detects rapid speed changes and "kicks" the heater to overcome thermal lag.
-- **Per-Material Flow Gates:** Only boosts temperature when approaching nozzle capacity (based on E3D Revo datasheet).
+The system monitors extrusion velocity and upcoming G-code to adjust temperature dynamically:
 
-| Material | HF Gate | Std Gate | E3D Rated Flow |
-|----------|---------|----------|----------------|
-| PLA | 10 mm³/s | 8 mm³/s | 13 mm³/s @ 220°C |
-| PETG | 14 mm³/s | 10 mm³/s | 17 mm³/s @ 240°C |
-| ABS/ASA | 12 mm³/s | 9 mm³/s | 15 mm³/s @ 260°C |
-| PC | 11 mm³/s | 8 mm³/s | — |
-| NYLON | 12 mm³/s | 9 mm³/s | — |
-| TPU | 5 mm³/s | 5 mm³/s | (boost disabled) |
+| Flow Condition | Action |
+|----------------|--------|
+| High flow (infill, fast walls) | Boost temperature to prevent under-extrusion |
+| Low flow (details, perimeters) | Return to base temp to reduce stringing |
+| Acceleration ramps | Predictive heating before flow increase |
+| Sharp corners | Maintain heat for proper PA behavior |
 
-### 2. Burst Protection (Noise Filtering)
-High-speed printing often involves tiny, rapid movements like **Gap Infill**.
-- **The Problem:** Without filtering, the script sees a 0.1-second spike to 300mm/s and immediately commands a +20°C boost. Since the move is over before the heater can react, the nozzle just overheats while idle.
-- **The Solution:** The script applies a **Rolling Weighted Average** to the flow calculation.
-  - Sustained speed (long walls/infill) triggers the full boost.
-  - Short bursts (< 0.5s) are smoothed out and ignored.
-  - This ensures the heater only reacts to moves long enough to benefit from the extra energy.
+### Flow Gates (When Boosting Activates)
 
-### 3. Smart Cornering ("Sticky Heat")
-High-speed printing often suffers from **Bulging Corners**. This happens because when the print head brakes for a corner, the pressure in the nozzle doesn't drop instantly.
-- **The Problem:** Standard logic cools the nozzle when speed drops. Cooler plastic = Higher Viscosity = More Bulging.
-- **The Fix:** This script uses **Asymmetric Smoothing**. It heats up *instantly* to match acceleration but cools down *very slowly*. This keeps the plastic fluid during corner braking, allowing the extruder to relieve pressure effectively.
+Boost only triggers when flow exceeds material-specific thresholds based on E3D Revo datasheet:
 
-### 4. Dynamic Pressure Advance
-Works in tandem with Smart Cornering. As the temperature boosts, the plastic becomes more fluid (lower viscosity).
-- **The Logic:** Hotter plastic requires **less** Pressure Advance to control.
-- **The Action:** The script automatically **lowers** your PA value as the temperature rises. This prevents the "gaps" or "shredded corners" that occur when you apply high-speed PA values to super-heated plastic.
-
-### 5. Live G-code Lookahead
-The system parses upcoming G-code moves to predict flow changes *before* they happen.
-- **Proactive Boosting:** Raises temperature before high-flow sections arrive
-- **Smoother Transitions:** Eliminates under-extrusion at flow ramp-ups
-
-### 6. Thermal Safety
-Built-in runaway protection with emergency shutdown if temperature exceeds safe limits.
-
-### 7. Self-Learning K-Values
-The system monitors thermal response and gradually optimizes boost aggressiveness over time.
-
-### 8. Automatic PA Learning (Experimental)
-The system learns optimal Pressure Advance values during printing:
-- **Corner Detection:** Monitors sharp corners (>45°) in your print
-- **Thermal Analysis:** Measures temperature deviation after corners
-- **Auto-Adjustment:** Tweaks PA in tiny increments (±0.002) based on thermal feedback
-- **Persistent Storage:** Saves learned PA per material at print end
-
-**How it works:**
-| Thermal Response | Meaning | Action |
-|------------------|---------|--------|
-| Too hot after corner | Over-extrusion (PA too low) | Increase PA |
-| Too cold after corner | Under-extrusion (PA too high) | Decrease PA |
-
-The learning is very conservative — it takes hundreds of corners to make meaningful adjustments. This prevents oscillation while slowly converging on optimal values.
+| Material | High Flow Nozzle | Standard Nozzle |
+|----------|------------------|-----------------|
+| PLA | 10 mm³/s | 8 mm³/s |
+| PETG | 14 mm³/s | 10 mm³/s |
+| ABS/ASA | 12 mm³/s | 9 mm³/s |
+| PC | 11 mm³/s | 8 mm³/s |
+| NYLON | 12 mm³/s | 9 mm³/s |
+| TPU | Disabled | Disabled |
 
 ---
 
-## 📦 Installation
+## Configuration
 
-### Step 1: Download the Files
-
-**Option A: Clone the repository (recommended)**
-```bash
-cd ~
-git clone https://github.com/barnard704344/Klipper-Adaptive-Flow.git
-cd Klipper-Adaptive-Flow
-
-# Copy Python modules to Klipper extras
-cp gcode_interceptor.py ~/klipper/klippy/extras/
-cp extruder_monitor.py ~/klipper/klippy/extras/
-
-# Copy macro file to your config
-cp auto_flow.cfg ~/printer_data/config/
-```
-
-**Option B: Download files directly**
-```bash
-# Python modules
-cd ~/klipper/klippy/extras/
-wget https://raw.githubusercontent.com/barnard704344/Klipper-Adaptive-Flow/main/gcode_interceptor.py
-wget https://raw.githubusercontent.com/barnard704344/Klipper-Adaptive-Flow/main/extruder_monitor.py
-
-# Macro file
-cd ~/printer_data/config/
-wget https://raw.githubusercontent.com/barnard704344/Klipper-Adaptive-Flow/main/auto_flow.cfg
-```
-
-**Option C: Manual creation (if wget unavailable)**
-
-Create each file using nano:
-```bash
-nano ~/klipper/klippy/extras/gcode_interceptor.py
-# Paste contents from GitHub, save with Ctrl+X, Y, Enter
-
-nano ~/klipper/klippy/extras/extruder_monitor.py
-# Paste contents from GitHub, save with Ctrl+X, Y, Enter
-
-nano ~/printer_data/config/auto_flow.cfg
-# Paste contents from GitHub, save with Ctrl+X, Y, Enter
-```
-
-Restart Klipper:
-```bash
-sudo systemctl restart klipper
-```
-
-### Step 2: Edit printer.cfg
-
-Add the following to your `printer.cfg`:
+Edit `auto_flow.cfg` to set your nozzle type:
 
 ```ini
-[include auto_flow.cfg]
-
-[gcode_interceptor]
-
-[extruder_monitor]
-
-[save_variables]
-filename: ~/printer_data/config/adaptive_flow_vars.cfg
+variable_use_high_flow_nozzle: True   # Set False for standard Revo nozzles
 ```
 
-**Toolhead Temperature Sensor (recommended for EBB36/SB2209):**
-```ini
-[temperature_sensor Toolhead_Temp]
-sensor_type: temperature_mcu
-sensor_mcu: EBBCan
-```
+All other settings auto-configure based on material detection.
 
-**Extruder Configuration:**
-```ini
-[extruder]
-max_extrude_only_distance: 101.0
-```
+### Key Settings
 
-### Step 3: Verify Installation
-
-Restart Klipper and check logs for:
-```
-GCodeInterceptor: Ready and intercepting G-code
-Live G-code lookahead hook installed via gcode_interceptor.
-```
-
-### Step 4: Integrate with Your PRINT_START Macro
-
-Add `AT_START` at the end of your `PRINT_START` macro (after heating), and `AT_END` at the start of your `PRINT_END` macro:
-
-```ini
-[gcode_macro PRINT_START]
-gcode:
-    {% set BED = params.BED|default(60)|int %}
-    {% set EXTRUDER = params.EXTRUDER|default(200)|int %}
-    
-    # Your existing startup sequence...
-    G28                          ; Home
-    M190 S{BED}                  ; Wait for bed
-    M109 S{EXTRUDER}             ; Wait for hotend
-    # ... bed mesh, purge line, etc ...
-    
-    # Enable Adaptive Flow (after heating!)
-    AT_START
-
-[gcode_macro PRINT_END]
-gcode:
-    AT_END                       ; Disable Adaptive Flow
-    # Your existing end sequence...
-    M104 S0                      ; Turn off hotend
-    M140 S0                      ; Turn off bed
-    G28 X Y                      ; Home X/Y
-```
-
-> **Important:** `AT_START` must be called AFTER heating is complete. It reads `printer.extruder.target` to detect material.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `flow_smoothing` | 0.3 | Filter for flow spikes (0.0-1.0, higher = more filtering) |
+| `max_boost_limit` | 50 | Maximum temp boost above base (°C) |
+| `ramp_rate_rise` | 4.0 | Max temp increase per second |
+| `ramp_rate_fall` | 0.2 | Max temp decrease per second (slow cooldown) |
+| `self_learning_enabled` | True | Auto-tune K-values over time |
+| `pa_auto_learning` | True | Experimental PA tuning from corners |
 
 ---
 
-## ⚙️ Configuration & Tuning
+## Auto-Detection
 
-All settings are located at the **top** of `auto_flow.cfg` in the USER CONFIGURATION block.
+`AT_START` detects material from your slicer's temperature setting:
 
-### Select Nozzle Type
-
-Edit `auto_flow.cfg`:
-- **Revo High Flow:** `variable_use_high_flow_nozzle: True`
-- **Revo Standard:** `variable_use_high_flow_nozzle: False`
-
----
-
-## ✂️ Slicer Configuration
-
-### Pressure Advance — Disable It
-
-The script manages PA dynamically. **Set PA to 0 in your slicer.**
-
-Store your calibrated values in Klipper instead:
-```gcode
-AT_SET_PA MATERIAL=PLA PA=0.045
-```
-
-### Temperatures — Use "Quality" Settings
-
-Set your slicer to normal quality temperatures. The script boosts automatically during high-speed moves.
-
-| Material | Slicer Temp | Script Boosts To |
-|----------|-------------|------------------|
-| PLA | 210°C | up to 235°C |
-| PETG | 245°C | up to 275°C |
-| ABS/ASA | 250°C | up to 290°C |
-
-### Max Volumetric Speed
-
-| Setup | Slicer Limit |
-|-------|--------------|
-| 40W + Standard Nozzle | 17 mm³/s |
-| 60W + Standard Nozzle | 20 mm³/s |
-| 40W + High Flow | 24 mm³/s |
-| 60W + High Flow | 32 mm³/s |
-
-> **Note:** For speeds above 26 mm³/s, the 60W HeaterCore is required — the 40W runs at 100% duty cycle and has no headroom for temperature boosts.
-
----
-
-## Zero-Config Features
-
-When using `AT_START`, several automatic systems handle configuration:
-
-### Temperature-Based Material Detection
-
-`AT_START` infers material from slicer temperature:
-
-| Temperature | Detected Material |
-|-------------|-------------------|
+| Temperature | Material |
+|-------------|----------|
 | 280°C+ | PC |
 | 260-280°C | NYLON |
 | 240-260°C | ABS/ASA |
 | 220-240°C | PETG |
 | 180-220°C | PLA |
-| 160-180°C | TPU |
-
-### Self-Learning K-Values
-
-The system monitors thermal response and adjusts:
-- **Too cold?** → Increases `speed_k` for faster response
-- **Too hot?** → Decreases `speed_k` to reduce overshoot
-- Learning is conservative (0.05/window) for stability
-
-### PA Auto-Learning
-
-Enable/disable in `auto_flow.cfg`:
-```ini
-variable_pa_auto_learning: True   # Enable corner-based PA learning
-variable_pa_learning_rate: 0.002  # Adjustment per 30 corners
-```
-
-The system detects sharp corners in your print, measures thermal response, and adjusts PA accordingly. Learned values are saved per-material at print end and automatically loaded on subsequent prints.
+| <180°C | TPU |
 
 ---
 
-## Command Reference
-
-### Core Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
-| `AT_START` | Zero-config enable — detects material, applies settings |
-| `AT_END` | Clean shutdown at print end |
-| `AT_ENABLE` | Manually enable adaptive flow |
-| `AT_DISABLE` | Manually disable adaptive flow |
-| `AT_STATUS` | Display current status and all settings (incl. corner count, PA learning) |
-
-### PA Commands
-
-| Command | Description |
-|---------|-------------|
+| `AT_START` | Enable adaptive flow (call after heating) |
+| `AT_END` | Disable and report stats |
+| `AT_STATUS` | Show current state, flow, boost level |
 | `AT_SET_PA MATERIAL=PLA PA=0.045` | Save calibrated PA value |
-| `AT_GET_PA MATERIAL=PLA` | Show PA for material |
-| `AT_LIST_PA` | List all PA values |
-
-### Feature Controls
-
-| Command | Description |
-|---------|-------------|
-| `AT_THERMAL_STATUS` | Show thermal safety status |
-
-### Diagnostic Commands
-
-| Command | Description |
-|---------|-------------|
-| `GET_PREDICTED_LOAD` | Predicted extrusion rate from lookahead |
-| `GET_COMMUNITY_DEFAULTS MATERIAL=PLA HF=1` | Show community defaults for a material |
-| `SET_LOOKAHEAD E=2.5 D=0.5` | Manually add lookahead segment |
-| `SET_LOOKAHEAD CLEAR` | Clear lookahead buffer |
+| `AT_LIST_PA` | List saved PA values |
 
 ---
 
-## Community Defaults
+## Self-Learning
 
-The system automatically fetches community-curated material settings from GitHub on startup:
+The system improves over time:
 
-- **Auto-cached locally** for 24 hours (works offline after first fetch)
-- **Per-material values** for speed_k, flow_gate, max_temp, and default_pa
-- **Your local settings always override** community defaults
+**K-Value Learning:** Monitors if temperature follows demand. Adjusts boost aggressiveness every 50 samples.
 
-Check available defaults:
-```gcode
-GET_COMMUNITY_DEFAULTS MATERIAL=PETG HF=1
-```
+**PA Learning (Experimental):** Detects sharp corners, measures thermal response. Too hot after corners = increase PA. Too cold = decrease PA. Saves learned values per material.
 
-The community defaults file is located at:
-`https://github.com/barnard704344/Klipper-Adaptive-Flow/blob/main/community_defaults.json`
+---
+
+## Slicer Settings
+
+- **Pressure Advance:** Set to 0 in slicer. Use `AT_SET_PA` to store values in Klipper.
+- **Temperature:** Use normal quality temps. Script boosts automatically when needed.
+- **Max Volumetric Speed:** Stay within your setup's limits:
+  | Setup | Limit |
+  |-------|-------|
+  | 40W + Standard | 17 mm³/s |
+  | 40W + High Flow | 24 mm³/s |
+  | 60W + High Flow | 32 mm³/s |
 
 ---
 
@@ -403,10 +143,10 @@ The community defaults file is located at:
 
 | Issue | Solution |
 |-------|----------|
-| Lookahead not working | Check logs for "intercepting G-code" message |
-| Erratic temperature | Lower lookahead boost multiplier or increase smoothing |
-| Thermal warnings | Check heater wattage vs flow rate demands |
-| No temperature boost | Flow must exceed material-specific gate (e.g. PLA: 10mm³/s HF, 8mm³/s std) |
+| No temperature boost | Flow below gate threshold — check `AT_STATUS` for current flow |
+| Erratic temperatures | Increase `flow_smoothing` to 0.5 |
+| "Heater struggling" warnings | Reduce max volumetric speed in slicer |
+| Thermal runaway errors | Lower `max_boost_limit` or check heater wiring |
 
 ---
 
@@ -414,24 +154,24 @@ The community defaults file is located at:
 
 | File | Purpose |
 |------|---------|
-| `extruder_monitor.py` | Klipper module — G-code lookahead, flow prediction, corner detection, community defaults fetch |
-| `auto_flow.cfg` | Macros for adaptive temp, PA, PA auto-learning, and lookahead boost |
-| `community_defaults.json` | Community-curated material settings (hosted on GitHub) |
+| `auto_flow.cfg` | Klipper macros — all adaptive logic |
+| `extruder_monitor.py` | G-code parsing, lookahead, corner detection |
+| `gcode_interceptor.py` | Hooks into Klipper G-code stream |
+| `community_defaults.json` | Shared material settings (auto-fetched) |
 
 ---
 
-## Compatibility
+## Requirements
 
-- **Hotend:** E3D Revo only (Revo HF or Revo Standard)
-- **Extrusion Mode:** Supports both absolute (M82) and relative (M83)
-- **Platform:** Tested on Klipper with Raspberry Pi
-- **Interfaces:** Works with Mainsail, Fluidd, and OctoPrint
+- **Hotend:** E3D Revo (HF or Standard) with 40W or 60W heater
+- **Firmware:** Klipper
+- **No TMC/StallGuard required** — uses velocity data only
 
 ---
 
 ## License
 
-MIT License — See LICENSE file for details.
+MIT License
 
 
 
