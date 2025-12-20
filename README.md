@@ -88,9 +88,16 @@ That's it. No `AT_INIT_MATERIAL`, no calibration wizards, no manual baseline set
 ### 1. Revo-Optimized Temp Boosting
 Automatically raises the temperature as flow rate increases.
 - **Predictive Acceleration:** Detects rapid speed changes and "kicks" the heater to overcome thermal lag.
-- **Flow Gates:** Ignores very slow moves to prevent unnecessary heating.
-  - **Standard Nozzle:** Boosts start > 2mm³/s.
-  - **High Flow Nozzle:** Boosts start > 3mm³/s.
+- **Per-Material Flow Gates:** Only boosts temperature when approaching nozzle capacity (based on E3D Revo datasheet).
+
+| Material | HF Gate | Std Gate | E3D Rated Flow |
+|----------|---------|----------|----------------|
+| PLA | 10 mm³/s | 8 mm³/s | 13 mm³/s @ 220°C |
+| PETG | 14 mm³/s | 10 mm³/s | 17 mm³/s @ 240°C |
+| ABS/ASA | 12 mm³/s | 9 mm³/s | 15 mm³/s @ 260°C |
+| PC | 11 mm³/s | 8 mm³/s | — |
+| NYLON | 12 mm³/s | 9 mm³/s | — |
+| TPU | 5 mm³/s | 5 mm³/s | (boost disabled) |
 
 ### 2. Burst Protection (Noise Filtering)
 High-speed printing often involves tiny, rapid movements like **Gap Infill**.
@@ -343,8 +350,27 @@ The system monitors thermal response and adjusts:
 | Command | Description |
 |---------|-------------|
 | `GET_PREDICTED_LOAD` | Predicted extrusion rate from lookahead |
+| `GET_COMMUNITY_DEFAULTS MATERIAL=PLA HF=1` | Show community defaults for a material |
 | `SET_LOOKAHEAD E=2.5 D=0.5` | Manually add lookahead segment |
 | `SET_LOOKAHEAD CLEAR` | Clear lookahead buffer |
+
+---
+
+## Community Defaults
+
+The system automatically fetches community-curated material settings from GitHub on startup:
+
+- **Auto-cached locally** for 24 hours (works offline after first fetch)
+- **Per-material values** for speed_k, flow_gate, max_temp, and default_pa
+- **Your local settings always override** community defaults
+
+Check available defaults:
+```gcode
+GET_COMMUNITY_DEFAULTS MATERIAL=PETG HF=1
+```
+
+The community defaults file is located at:
+`https://github.com/CaptainKirk7/Klipper-Adaptive-Flow/blob/main/community_defaults.json`
 
 ---
 
@@ -355,7 +381,7 @@ The system monitors thermal response and adjusts:
 | Lookahead not working | Check logs for "intercepting G-code" message |
 | Erratic temperature | Lower lookahead boost multiplier or increase smoothing |
 | Thermal warnings | Check heater wattage vs flow rate demands |
-| No temperature boost | Verify flow exceeds 2mm³/s (std) or 3mm³/s (HF) |
+| No temperature boost | Flow must exceed material-specific gate (e.g. PLA: 10mm³/s HF, 8mm³/s std) |
 
 ---
 
@@ -363,8 +389,9 @@ The system monitors thermal response and adjusts:
 
 | File | Purpose |
 |------|---------|
-| `extruder_monitor.py` | Klipper module — G-code lookahead parsing and flow prediction |
+| `extruder_monitor.py` | Klipper module — G-code lookahead, flow prediction, community defaults fetch |
 | `auto_flow.cfg` | Macros for adaptive temp, PA, and lookahead boost |
+| `community_defaults.json` | Community-curated material settings (hosted on GitHub) |
 
 ---
 

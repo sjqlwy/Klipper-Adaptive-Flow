@@ -1,7 +1,14 @@
 import logging
 import threading
 import time
+import json
+import os
 from collections import deque
+
+# Community defaults configuration
+COMMUNITY_DEFAULTS_URL = "https://raw.githubusercontent.com/CaptainKirk7/Klipper-Adaptive-Flow/main/community_defaults.json"
+CACHE_FILE = "~/printer_data/config/adaptive_flow_community_cache.json"
+CACHE_MAX_AGE_HOURS = 24
 
 
 class ExtruderMonitor:
@@ -41,6 +48,96 @@ class ExtruderMonitor:
         # Pre-compile regex for performance
         import re
         self._param_re = re.compile(r'([A-Za-z])([-+]?[0-9]*\.?[0-9]+)')
+        
+        # Community defaults - fetch/cache on startup
+        self._community_defaults = None
+        self._load_community_defaults()
+
+    def _load_community_defaults(self):
+        """Load community defaults from cache or fetch from GitHub."""
+        cache_path = os.path.expanduser(CACHE_FILE)
+        logger = logging.getLogger('ExtruderMonitor')
+        
+        # Try to load from cache first
+        try:
+            if os.path.exists(cache_path):
+                cache_age_hours = (time.time() - os.path.getmtime(cache_path)) / 3600
+                if cache_age_hours < CACHE_MAX_AGE_HOURS:
+                    with open(cache_path, 'r') as f:
+                        self._community_defaults = json.load(f)
+                        logger.info(f"Loaded community defaults from cache (age: {cache_age_hours:.1f}h)")
+                        return
+        except Exception as e:
+            logger.debug(f"Cache read failed: {e}")
+        
+        # Fetch from GitHub (in background thread to not block startup)
+        def fetch_defaults():
+            try:
+                import urllib.request
+                import ssl
+                
+                # Create SSL context that works on most systems
+                ctx = ssl.create_default_context()
+                
+                req = urllib.request.Request(
+                    COMMUNITY_DEFAULTS_URL,
+                    headers={'User-Agent': 'Klipper-Adaptive-Flow/1.0'}
+                )
+                
+                with urllib.request.urlopen(req, timeout=10, context=ctx) as response:
+                    data = json.loads(response.read().decode('utf-8'))
+                    
+                    # Save to cache
+                    try:
+                        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+                        with open(cache_path, 'w') as f:
+                            json.dump(data, f, indent=2)
+                    except Exception as e:
+                        logger.debug(f"Cache write failed: {e}")
+                    
+                    self._community_defaults = data
+                    logger.info(f"Fetched community defaults v{data.get('_version', 'unknown')}")
+                    
+            except Exception as e:
+                logger.info(f"Community defaults fetch skipped (offline or unavailable): {e}")
+                # Try to load stale cache as fallback
+                try:
+                    if os.path.exists(cache_path):
+                        with open(cache_path, 'r') as f:
+                            self._community_defaults = json.load(f)
+                            logger.info("Using stale cache as fallback")
+                except:
+                    pass
+        
+        # Run fetch in background
+        thread = threading.Thread(target=fetch_defaults, daemon=True)
+        thread.start()
+    
+    def get_community_material(self, material, use_high_flow=True):
+        """Get community defaults for a material. Returns dict or None."""
+        if not self._community_defaults:
+            return None
+        
+        materials = self._community_defaults.get('materials', {})
+        
+        # Try exact match first
+        mat_data = materials.get(material.upper())
+        if not mat_data:
+            # Try partial match
+            for mat_name, data in materials.items():
+                if mat_name in material.upper():
+                    mat_data = data
+                    break
+        
+        if not mat_data:
+            return None
+        
+        # Return the appropriate nozzle variant
+        nozzle_key = 'high_flow' if use_high_flow else 'standard'
+        result = mat_data.get(nozzle_key, {}).copy()
+        result['default_pa'] = mat_data.get('default_pa', 0.04)
+        result['description'] = mat_data.get('description', '')
+        return result
 
     def handle_connect(self):
         try:
@@ -61,6 +158,8 @@ class ExtruderMonitor:
                                desc="Add a load sample to calibration buffer")
         gcode.register_command("FINISH_CALIBRATION", self.cmd_FINISH_CALIBRATION,
                                desc="Calculate and save baseline from collected samples")
+        gcode.register_command("GET_COMMUNITY_DEFAULTS", self.cmd_GET_COMMUNITY_DEFAULTS,
+                               desc="Get community defaults for a material: GET_COMMUNITY_DEFAULTS MATERIAL=PLA HF=1")
         
         # Calibration state
         self._calibration_samples = []
@@ -474,6 +573,30 @@ class ExtruderMonitor:
         gcmd.respond_info(f'  variable_sensor_baseline: {baseline}')
         gcmd.respond_info('=' * 50)
 
+    def cmd_GET_COMMUNITY_DEFAULTS(self, gcmd):
+        """Get community defaults for a material."""
+        material = gcmd.get('MATERIAL', 'PLA').upper()
+        use_hf = gcmd.get_int('HF', 1) == 1
+        
+        data = self.get_community_material(material, use_hf)
+        
+        if data:
+            nozzle_type = "High Flow" if use_hf else "Standard"
+            gcmd.respond_info(f"Community defaults for {material} ({nozzle_type}):")
+            gcmd.respond_info(f"  speed_k: {data.get('speed_k', 'N/A')}")
+            gcmd.respond_info(f"  flow_gate: {data.get('flow_gate', 'N/A')} mm³/s")
+            gcmd.respond_info(f"  max_temp: {data.get('max_temp', 'N/A')}°C")
+            gcmd.respond_info(f"  default_pa: {data.get('default_pa', 'N/A')}")
+            if data.get('description'):
+                gcmd.respond_info(f"  note: {data['description']}")
+        else:
+            if self._community_defaults:
+                gcmd.respond_info(f"No community defaults for '{material}'")
+                available = list(self._community_defaults.get('materials', {}).keys())
+                gcmd.respond_info(f"Available: {', '.join(available)}")
+            else:
+                gcmd.respond_info("Community defaults not loaded (offline or unavailable)")
+
     def get_status(self, eventtime):
         # Called by Klippy status updates; include predicted rate if available
         status = {'load': -1}
@@ -498,6 +621,11 @@ class ExtruderMonitor:
                 status['travel_duration'] = time.time() - self._travel_start_time
             else:
                 status['travel_duration'] = 0.0
+        
+        # Community defaults status
+        status['community_defaults_loaded'] = self._community_defaults is not None
+        if self._community_defaults:
+            status['community_defaults_version'] = self._community_defaults.get('_version', 'unknown')
         
         return status
 
