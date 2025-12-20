@@ -38,6 +38,8 @@ Automatically adjusts nozzle temperature based on real-time extrusion flow — h
 
 5. **Restart Klipper and print.** That's it.
 
+📄 **[Slicer Configuration Guide](docs/slicer-configuration.md)** — Complete setup for PrusaSlicer, Cura, OrcaSlicer
+
 ---
 
 ## How It Works
