@@ -41,25 +41,14 @@ Add to your `printer.cfg`:
 PRINT_START BED=[bed_temperature_initial_layer_single] EXTRUDER=[nozzle_temperature_initial_layer] MATERIAL=[filament_type]
 ```
 
-**In printer.cfg:**
-```ini
-[gcode_macro PRINT_START]
-gcode:
-    {% set BED = params.BED|default(60)|int %}
-    {% set EXTRUDER = params.EXTRUDER|default(200)|int %}
-    {% set MATERIAL = params.MATERIAL|default("PLA")|string %}
-    
-    G28                      ; Home
-    M190 S{BED}              ; Wait for bed
-    M109 S{EXTRUDER}         ; Wait for hotend
-    
-    AT_START                 ; Enable adaptive flow (AFTER heating!)
+**OrcaSlicer/PrusaSlicer end G-code:**
+```gcode
+PRINT_END
 ```
 
-**Slicer end G-code:**
-```gcode
-AT_END
-```
+See example macros:
+- [PRINT_START.example](PRINT_START.example) — Generic
+- [PRINT_START_VORON24.example](PRINT_START_VORON24.example) — Voron 2.4 with QGL, Eddy, SFS
 
 ## Configuration
 
@@ -120,6 +109,8 @@ No TMC StallGuard required — uses velocity data only.
 | `extruder_monitor.py` | G-code parsing and lookahead |
 | `gcode_interceptor.py` | Hooks into Klipper G-code stream |
 | `community_defaults.json` | Shared material settings |
+| `PRINT_START.example` | Generic PRINT_START/END macros |
+| `PRINT_START_VORON24.example` | Voron 2.4 specific macros |
 
 ## License
 
