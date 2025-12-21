@@ -1,14 +1,16 @@
 # Klipper Adaptive Flow
 
-Automatic temperature control for E3D Revo hotends on Klipper. Dynamically boosts nozzle temperature during high-flow sections — no manual tuning required.
+Automatic temperature and pressure advance control for E3D Revo hotends on Klipper. Dynamically boosts nozzle temperature during high-flow sections and adjusts PA in real-time — no manual tuning required.
 
 ## Features
 
-- **Flow-based boost** — increases temp for fast infill/thick lines
-- **Speed-based boost** — increases temp for fast thin walls
+- **Dynamic temperature** — flow/speed/acceleration-based boost
+- **Dynamic PA** — scales with temperature boost automatically
+- **5-second lookahead** — pre-heats before flow spikes
 - **First layer skip** — consistent squish on layer 1
 - **Heater monitoring** — won't request more than your heater can deliver
-- **Self-learning** — optimizes over time
+- **Self-learning** — optimizes K-values and PA over time
+- **Per-material profiles** — auto-detects PLA, PETG, ABS, TPU, etc.
 
 ## Installation
 
@@ -39,7 +41,7 @@ PRINT_START BED=[bed_temperature_initial_layer_single] EXTRUDER=[nozzle_temperat
 PRINT_END
 ```
 
-See [PRINT_START.example](PRINT_START.example) or [PRINT_START_VORON24.example](PRINT_START_VORON24.example).
+See [PRINT_START.example](PRINT_START.example) for a complete example.
 
 ## Printer Macros
 
@@ -53,9 +55,12 @@ gcode:
 
 [gcode_macro PRINT_END]
 gcode:
-    AT_END                            # Save learned values
+    AT_END                            # Stop loop, save learned values
+    TURN_OFF_HEATERS                  # Must come AFTER AT_END
     # ... your cooldown, park, etc ...
 ```
+
+> **Important:** Call `AT_END` *before* `TURN_OFF_HEATERS` to ensure the control loop stops first.
 
 ## Configuration
 
@@ -70,9 +75,22 @@ variable_use_high_flow_nozzle: True   # False for standard Revo
 
 | Command | Description |
 |---------|-------------|
-| `AT_STATUS` | Show current state, flow, boost |
+| `AT_STATUS` | Show current state, flow, boost, PA |
 | `AT_SET_PA MATERIAL=X PA=Y` | Save calibrated PA |
 | `AT_LIST_PA` | Show all PA values |
+
+## How It Works
+
+1. **Flow boost**: Temperature increases with volumetric flow rate
+2. **Speed boost**: Extra heating for high-speed thin walls (>100mm/s)
+3. **Lookahead**: Predicts flow 5 seconds ahead for pre-heating
+4. **Dynamic PA**: Automatically reduces PA as temperature increases (higher temp = lower viscosity = less PA needed)
+
+Example during a print:
+```
+Base temp: 230°C, Base PA: 0.060
+High flow detected → Boost +20°C → Temp 250°C, PA 0.048
+```
 
 ## Requirements
 

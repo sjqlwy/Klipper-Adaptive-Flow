@@ -14,6 +14,26 @@ Everything else auto-configures based on your material.
 
 ---
 
+## How It Works
+
+### Temperature Control
+- **Flow boost**: Temperature increases with volumetric flow (mm³/s)
+- **Speed boost**: Extra heating for high-speed thin walls (>100mm/s)
+- **Acceleration boost**: Detects corners via motion analysis
+- **Lookahead**: 5-second prediction buffer for pre-heating
+
+### Dynamic Pressure Advance
+PA automatically scales with temperature boost:
+```
+PA_adjusted = PA_base × (1 - boost × 0.01)
+```
+
+Example: Base PA 0.060, +20°C boost → PA becomes 0.048
+
+Higher temperature = lower filament viscosity = less PA needed.
+
+---
+
 ## Material Settings
 
 ### Per-Material Defaults
@@ -36,7 +56,7 @@ These are applied automatically when `AT_START` detects your material:
 - **Max Temp**: Safety limit for that material
 - **PA**: Default Pressure Advance value
 - **Ramp Rise**: How fast temperature increases (°C/second)
-- **Ramp Fall**: How fast temperature decreases (°C/second)
+- **Ramp Fall**: How fast temperature decreases (°C/second) — higher = less corner bulging
 
 ---
 
@@ -49,7 +69,7 @@ Edit these variables in `auto_flow.cfg` if needed:
 ```ini
 variable_max_boost_limit: 50.0        # Max boost above base temp (°C)
 variable_ramp_rate_rise: 4.0          # Heat up speed (°C/s)
-variable_ramp_rate_fall: 1.0          # Cool down speed (°C/s)
+variable_ramp_rate_fall: 1.0          # Cool down speed (°C/s) — increase to reduce corner bulging
 ```
 
 ### Speed-Based Boost
@@ -76,6 +96,8 @@ variable_first_layer_skip: True        # Disable boost on first layer
 variable_first_layer_height: 0.3       # Z height considered "first layer"
 ```
 
+First layer detection uses Z height as fallback when slicer layer info is unavailable.
+
 ### Thermal Safety
 
 ```ini
@@ -89,6 +111,13 @@ Automatically managed — no config needed:
 - **95%+ PWM**: Freeze boost at current level
 - **99%+ PWM**: Actively reduce boost
 - **<90% PWM**: Safe for K-value learning
+
+### Lookahead Settings
+
+Configured in `extruder_monitor.py`:
+- **Buffer size**: 5 seconds of predicted flow
+- **Update rate**: 1 second loop
+- **Weight**: 0.8 (80% confidence in prediction)
 
 ### Self-Learning
 
@@ -108,8 +137,8 @@ variable_pa_learning_rate: 0.002       # PA adjustment rate
 | Command | Description |
 |---------|-------------|
 | `AT_START` | Enable adaptive flow (call after heating) |
-| `AT_END` | Disable and save learned values |
-| `AT_STATUS` | Show current state, flow, boost, PWM |
+| `AT_END` | Stop loop, save learned values (call before TURN_OFF_HEATERS) |
+| `AT_STATUS` | Show current state, flow, boost, PA, PWM |
 
 ### PA Commands
 
@@ -154,7 +183,12 @@ variable_pa_learning_rate: 0.002       # PA adjustment rate
 ║ Flow Gate:   14.0 mm³/s                   ║  # Min flow for boost
 ║ Current Flow: 8.34 mm³/s                  ║  # Live volumetric flow
 ║ Toolhead:   169.2 mm/s (>100)             ║  # Linear speed
-║ Predicted:    9.63 mm/s                   ║  # Lookahead prediction
+║ Predicted:    9.63 mm/s                   ║  # 5s lookahead prediction
+╠═══════════════════════════════════════════╣
+║ PRESSURE ADVANCE                          ║
+╠═══════════════════════════════════════════╣
+║ Base PA:     0.060                        ║  # Material default
+║ Current PA:  0.048                        ║  # Adjusted for temp boost
 ╠═══════════════════════════════════════════╣
 ║ SAFETY                                    ║
 ╠═══════════════════════════════════════════╣
@@ -176,8 +210,8 @@ variable_pa_learning_rate: 0.002       # PA adjustment rate
 - Is heater at 95%+ PWM? (boost frozen)
 
 ### Corner bulging
-- Increase `ramp_rate_fall` (faster cooldown)
-- Check PA is being applied (`AT_STATUS` shows Base PA)
+- Increase `ramp_rate_fall` (faster cooldown) — PETG defaults to 1.5°C/s
+- Check PA is being applied (AT_STATUS shows current PA)
 - Reduce `speed_k` for less aggressive boost
 
 ### Under-extrusion at high speed
@@ -187,4 +221,22 @@ variable_pa_learning_rate: 0.002       # PA adjustment rate
 
 ### PA showing 0.000
 - Fixed in latest version — update `auto_flow.cfg`
-- Run `AT_LIST_PA` to verify defaults
+- Run `AT_LIST_PA` to verify defaults are set
+
+### Heaters stay on after print
+- Fixed in latest version — `AT_END` now stops the control loop immediately
+- Ensure `AT_END` is called before `TURN_OFF_HEATERS` in PRINT_END
+
+---
+
+## Data Sources
+
+### Native Klipper (no Python required)
+- `printer.motion_report.live_extruder_velocity` → volumetric flow
+- `printer.motion_report.live_velocity` → toolhead speed
+- `printer.extruder.power` → heater PWM %
+- `printer.toolhead.position.z` → Z height
+
+### Python Extras (enhanced features)
+- `extruder_monitor.py` → 5-second lookahead, corner detection
+- `gcode_interceptor.py` → G-code stream parsing
