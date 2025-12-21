@@ -41,6 +41,22 @@ PRINT_END
 
 See [PRINT_START.example](PRINT_START.example) or [PRINT_START_VORON24.example](PRINT_START_VORON24.example).
 
+## Printer Macros
+
+Add `AT_START` after heating and `AT_END` at print end in your macros:
+
+```ini
+[gcode_macro PRINT_START]
+gcode:
+    # ... your heating, homing, leveling ...
+    AT_START                          # Enable adaptive flow
+
+[gcode_macro PRINT_END]
+gcode:
+    AT_END                            # Save learned values
+    # ... your cooldown, park, etc ...
+```
+
 ## Configuration
 
 One setting for most users — edit `auto_flow.cfg`:
