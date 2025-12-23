@@ -12,10 +12,9 @@
 
 [gcode_macro PRINT_START]
 gcode:
-    # Get params from slicer (MATERIAL is required for Adaptive Flow)
+    # Get params from slicer
     {% set BED = params.BED|default(60)|int %}
     {% set EXTRUDER = params.EXTRUDER|default(200)|int %}
-    {% set MATERIAL = params.MATERIAL|string %}
     
     # Geometry helpers
     {% set x_max = printer.toolhead.axis_maximum.x|float %}
@@ -64,8 +63,8 @@ gcode:
     G90
     G92 E0
     
-    # Enable Adaptive Flow with material from slicer
-    AT_START MATERIAL={MATERIAL}
+    # Enable Adaptive Flow (pass MATERIAL from slicer)
+    AT_START MATERIAL={params.MATERIAL}
 
 
 [gcode_macro PRINT_END]
