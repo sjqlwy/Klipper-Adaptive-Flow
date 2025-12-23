@@ -1,9 +1,21 @@
+# =============================================================================
+# SLICER SETUP (required)
+# =============================================================================
+# In your slicer's "Start G-code", add:
+#   PRINT_START BED=[first_layer_bed_temperature] EXTRUDER=[first_layer_temperature] MATERIAL={filament_type[0]}
+#
+# IMPORTANT: Disable Pressure Advance in your slicer - Adaptive Flow handles it.
+#   PrusaSlicer/OrcaSlicer: Printer Settings → Custom G-code → clear PA commands
+#   Cura: Remove any SET_PRESSURE_ADVANCE from start g-code
+#   SuperSlicer: Printer Settings → Firmware → disable "use firmware PA"
+# =============================================================================
+
 [gcode_macro PRINT_START]
 gcode:
-    # Get params from slicer
+    # Get params from slicer (MATERIAL is required for Adaptive Flow)
     {% set BED = params.BED|default(60)|int %}
     {% set EXTRUDER = params.EXTRUDER|default(200)|int %}
-    {% set MATERIAL = params.MATERIAL|default("PLA")|string %}
+    {% set MATERIAL = params.MATERIAL|string %}
     
     # Geometry helpers
     {% set x_max = printer.toolhead.axis_maximum.x|float %}
