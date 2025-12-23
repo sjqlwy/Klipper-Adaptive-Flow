@@ -3,12 +3,18 @@ import threading
 import time
 import json
 import os
+import csv
 from collections import deque
+from datetime import datetime
 
 # Community defaults configuration
 COMMUNITY_DEFAULTS_URL = "https://raw.githubusercontent.com/barnard704344/Klipper-Adaptive-Flow/main/community_defaults.json"
 CACHE_FILE = "~/printer_data/config/adaptive_flow_community_cache.json"
 CACHE_MAX_AGE_HOURS = 24
+
+# Logging configuration
+LOG_DIR = "~/printer_data/logs/adaptive_flow"
+MAX_LOG_FILES = 20  # Keep last 20 print logs
 
 
 class ExtruderMonitor:
@@ -56,6 +62,14 @@ class ExtruderMonitor:
         self._last_move_vector = None  # (dx, dy) of previous move
         self._corner_events = deque(maxlen=50)  # (timestamp, angle_degrees, had_extrusion)
         self._corner_lock = threading.Lock()
+        
+        # Print session logging
+        self._log_lock = threading.Lock()
+        self._log_file = None
+        self._log_writer = None
+        self._log_start_time = None
+        self._log_sample_count = 0
+        self._log_stats = {}  # Running stats for summary
 
     def _load_community_defaults(self):
         """Load community defaults from cache or fetch from GitHub."""
@@ -160,6 +174,12 @@ class ExtruderMonitor:
                                desc="Get predicted extrusion rate and estimated load using lookahead")
         gcode.register_command("GET_COMMUNITY_DEFAULTS", self.cmd_GET_COMMUNITY_DEFAULTS,
                                desc="Get community defaults for a material: GET_COMMUNITY_DEFAULTS MATERIAL=PLA HF=1")
+        gcode.register_command("AT_LOG_START", self.cmd_AT_LOG_START,
+                               desc="Start logging print session data")
+        gcode.register_command("AT_LOG_DATA", self.cmd_AT_LOG_DATA,
+                               desc="Log a data point during printing")
+        gcode.register_command("AT_LOG_END", self.cmd_AT_LOG_END,
+                               desc="End logging and write summary")
 
         # Attempt to attach a live G-code listener using multiple methods
         hook_installed = False
@@ -529,6 +549,196 @@ class ExtruderMonitor:
                 gcmd.respond_info(f"Available: {', '.join(available)}")
             else:
                 gcmd.respond_info("Community defaults not loaded (offline or unavailable)")
+
+    def _ensure_log_dir(self):
+        """Create log directory if it doesn't exist."""
+        log_dir = os.path.expanduser(LOG_DIR)
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
+
+    def _cleanup_old_logs(self, log_dir):
+        """Keep only the most recent MAX_LOG_FILES log files."""
+        try:
+            files = []
+            for f in os.listdir(log_dir):
+                if f.endswith('.csv'):
+                    path = os.path.join(log_dir, f)
+                    files.append((os.path.getmtime(path), path))
+            
+            files.sort(reverse=True)
+            for _, path in files[MAX_LOG_FILES:]:
+                try:
+                    os.remove(path)
+                    # Also remove corresponding JSON summary
+                    json_path = path.replace('.csv', '_summary.json')
+                    if os.path.exists(json_path):
+                        os.remove(json_path)
+                except:
+                    pass
+        except Exception as e:
+            logging.getLogger('ExtruderMonitor').debug(f"Log cleanup error: {e}")
+
+    def cmd_AT_LOG_START(self, gcmd):
+        """Start a new logging session for this print."""
+        logger = logging.getLogger('ExtruderMonitor')
+        
+        material = gcmd.get('MATERIAL', 'UNKNOWN')
+        filename = gcmd.get('FILE', 'unknown')
+        
+        with self._log_lock:
+            # Close any existing log
+            if self._log_file:
+                try:
+                    self._log_file.close()
+                except:
+                    pass
+            
+            try:
+                log_dir = self._ensure_log_dir()
+                self._cleanup_old_logs(log_dir)
+                
+                # Create filename with timestamp
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                safe_filename = ''.join(c for c in filename if c.isalnum() or c in '._-')[:50]
+                log_path = os.path.join(log_dir, f"{timestamp}_{safe_filename}.csv")
+                
+                self._log_file = open(log_path, 'w', newline='')
+                self._log_writer = csv.writer(self._log_file)
+                
+                # Write header
+                self._log_writer.writerow([
+                    'elapsed_s', 'temp_actual', 'temp_target', 'boost',
+                    'flow', 'speed', 'pwm', 'pa', 'z_height', 'predicted_flow'
+                ])
+                
+                self._log_start_time = time.time()
+                self._log_sample_count = 0
+                self._log_stats = {
+                    'material': material,
+                    'filename': filename,
+                    'start_time': datetime.now().isoformat(),
+                    'boost_sum': 0.0,
+                    'boost_max': 0.0,
+                    'pwm_sum': 0.0,
+                    'pwm_max': 0.0,
+                    'flow_sum': 0.0,
+                    'flow_max': 0.0,
+                    'speed_max': 0.0,
+                    'thermal_lag_sum': 0.0,
+                }
+                
+                gcmd.respond_info(f"AT_LOG: Started logging to {log_path}")
+                logger.info(f"Started print logging: {log_path}")
+                
+            except Exception as e:
+                gcmd.respond_info(f"AT_LOG: Failed to start logging: {e}")
+                logger.error(f"Failed to start logging: {e}")
+
+    def cmd_AT_LOG_DATA(self, gcmd):
+        """Log a single data point during printing."""
+        with self._log_lock:
+            if not self._log_writer:
+                return  # Logging not active
+            
+            try:
+                elapsed = time.time() - self._log_start_time
+                temp_actual = gcmd.get_float('TEMP', 0.0)
+                temp_target = gcmd.get_float('TARGET', 0.0)
+                boost = gcmd.get_float('BOOST', 0.0)
+                flow = gcmd.get_float('FLOW', 0.0)
+                speed = gcmd.get_float('SPEED', 0.0)
+                pwm = gcmd.get_float('PWM', 0.0)
+                pa = gcmd.get_float('PA', 0.0)
+                z_height = gcmd.get_float('Z', 0.0)
+                predicted = gcmd.get_float('PREDICTED', 0.0)
+                
+                self._log_writer.writerow([
+                    f"{elapsed:.1f}",
+                    f"{temp_actual:.1f}",
+                    f"{temp_target:.1f}",
+                    f"{boost:.1f}",
+                    f"{flow:.2f}",
+                    f"{speed:.1f}",
+                    f"{pwm:.3f}",
+                    f"{pa:.4f}",
+                    f"{z_height:.2f}",
+                    f"{predicted:.2f}"
+                ])
+                
+                # Update running stats
+                self._log_sample_count += 1
+                self._log_stats['boost_sum'] += boost
+                self._log_stats['boost_max'] = max(self._log_stats['boost_max'], boost)
+                self._log_stats['pwm_sum'] += pwm
+                self._log_stats['pwm_max'] = max(self._log_stats['pwm_max'], pwm)
+                self._log_stats['flow_sum'] += flow
+                self._log_stats['flow_max'] = max(self._log_stats['flow_max'], flow)
+                self._log_stats['speed_max'] = max(self._log_stats['speed_max'], speed)
+                self._log_stats['thermal_lag_sum'] += (temp_target - temp_actual)
+                
+                # Flush periodically
+                if self._log_sample_count % 60 == 0:
+                    self._log_file.flush()
+                    
+            except Exception as e:
+                logging.getLogger('ExtruderMonitor').debug(f"Log data error: {e}")
+
+    def cmd_AT_LOG_END(self, gcmd):
+        """End logging session and write summary."""
+        logger = logging.getLogger('ExtruderMonitor')
+        
+        with self._log_lock:
+            if not self._log_file:
+                gcmd.respond_info("AT_LOG: No active logging session")
+                return
+            
+            try:
+                # Calculate final stats
+                duration_s = time.time() - self._log_start_time
+                samples = self._log_sample_count
+                
+                if samples > 0:
+                    summary = {
+                        'material': self._log_stats['material'],
+                        'filename': self._log_stats['filename'],
+                        'start_time': self._log_stats['start_time'],
+                        'end_time': datetime.now().isoformat(),
+                        'duration_min': round(duration_s / 60, 1),
+                        'samples': samples,
+                        'avg_boost': round(self._log_stats['boost_sum'] / samples, 2),
+                        'max_boost': round(self._log_stats['boost_max'], 1),
+                        'avg_pwm': round(self._log_stats['pwm_sum'] / samples, 3),
+                        'max_pwm': round(self._log_stats['pwm_max'], 3),
+                        'avg_flow': round(self._log_stats['flow_sum'] / samples, 2),
+                        'max_flow': round(self._log_stats['flow_max'], 2),
+                        'max_speed': round(self._log_stats['speed_max'], 1),
+                        'avg_thermal_lag': round(self._log_stats['thermal_lag_sum'] / samples, 2),
+                    }
+                    
+                    # Write summary JSON
+                    log_path = self._log_file.name
+                    summary_path = log_path.replace('.csv', '_summary.json')
+                    with open(summary_path, 'w') as f:
+                        json.dump(summary, f, indent=2)
+                    
+                    gcmd.respond_info(f"AT_LOG: Session ended - {samples} samples over {summary['duration_min']}min")
+                    gcmd.respond_info(f"AT_LOG: Avg boost: {summary['avg_boost']}C, Max: {summary['max_boost']}C")
+                    gcmd.respond_info(f"AT_LOG: Avg PWM: {summary['avg_pwm']:.1%}, Max: {summary['max_pwm']:.1%}")
+                    gcmd.respond_info(f"AT_LOG: Summary saved to {summary_path}")
+                    logger.info(f"Print log summary: {summary}")
+                
+                self._log_file.close()
+                
+            except Exception as e:
+                gcmd.respond_info(f"AT_LOG: Error ending session: {e}")
+                logger.error(f"Log end error: {e}")
+            
+            finally:
+                self._log_file = None
+                self._log_writer = None
+                self._log_start_time = None
+                self._log_sample_count = 0
+                self._log_stats = {}
 
     def get_status(self, eventtime):
         # Called by Klippy status updates; include predicted rate if available
