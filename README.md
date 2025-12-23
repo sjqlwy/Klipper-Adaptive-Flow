@@ -54,7 +54,7 @@ Add `AT_START` after heating and `AT_END` at print end:
 [gcode_macro PRINT_START]
 gcode:
     # ... your heating, homing, leveling ...
-    AT_START MATERIAL={params.MATERIAL}   # Enable adaptive flow
+    AT_START                              # Enable adaptive flow
 
 [gcode_macro PRINT_END]
 gcode:
@@ -63,7 +63,7 @@ gcode:
     # ... your cooldown, park, etc ...
 ```
 
-The slicer passes MATERIAL directly — AT_START handles it. If not provided, falls back to temperature detection.
+MATERIAL is detected automatically from extruder temperature. For better accuracy, pass it from your slicer's start g-code (see Slicer Setup above).
 
 > **Important:** Call `AT_END` *before* `TURN_OFF_HEATERS` to ensure the control loop stops first.
 
