@@ -144,6 +144,8 @@ def load_config_file():
                                 CONFIG['analyze_klippy_log'] = value
                             elif key == 'max_csv_rows' and isinstance(value, int):
                                 CONFIG['max_csv_rows'] = value
+                            elif key == 'ollama_url':
+                                CONFIG['ollama_url'] = value
                 
                 return config_path
             except Exception as e:
@@ -216,6 +218,11 @@ def configure_provider(provider_name):
     CONFIG['api_url'] = provider['api_url']
     CONFIG['model'] = provider['model']
     CONFIG['format'] = provider['format']
+    
+    # Use custom Ollama URL if configured
+    if provider_name == 'ollama' and CONFIG.get('ollama_url'):
+        ollama_base = CONFIG['ollama_url'].rstrip('/')
+        CONFIG['api_url'] = f"{ollama_base}/v1/chat/completions"
     
     # Find API key from environment
     api_key = provider.get('default_key', '')
