@@ -32,7 +32,7 @@ from urllib.parse import urlparse, parse_qs
 import urllib.request
 
 # =============================================================================
-# CONFIGURATION
+# CONFIGURATION - Loaded from analysis_config.cfg or defaults
 # =============================================================================
 CONFIG = {
     'listen_port': 7126,  # Port for webhook listener
@@ -42,7 +42,65 @@ CONFIG = {
     'notify_console': True,  # Send results to Klipper console
     'log_file': os.path.expanduser('~/printer_data/logs/adaptive_flow_hook.log'),
     'provider': None,  # LLM provider: openai, anthropic, gemini, github, ollama, openrouter
+    'hook_mode': 'poll',  # poll or webhook
 }
+
+
+def load_config_file():
+    """Load settings from analysis_config.cfg if it exists."""
+    config_paths = [
+        os.path.join(os.path.dirname(__file__), 'analysis_config.cfg'),
+        os.path.expanduser('~/Klipper-Adaptive-Flow/analysis_config.cfg'),
+        os.path.expanduser('~/printer_data/config/analysis_config.cfg'),
+    ]
+    
+    for config_path in config_paths:
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#') or line.startswith('['):
+                            continue
+                        if ':' in line:
+                            key, value = line.split(':', 1)
+                            key = key.strip()
+                            value = value.strip()
+                            
+                            if not value:
+                                continue
+                            
+                            # Parse booleans
+                            if value.lower() == 'true':
+                                value = True
+                            elif value.lower() == 'false':
+                                value = False
+                            elif value.isdigit():
+                                value = int(value)
+                            
+                            # Map config keys
+                            if key == 'provider':
+                                CONFIG['provider'] = value
+                            elif key == 'auto_apply':
+                                CONFIG['auto_apply'] = value
+                            elif key == 'notify_console':
+                                CONFIG['notify_console'] = value
+                            elif key == 'moonraker_url':
+                                CONFIG['moonraker_url'] = value
+                            elif key == 'hook_mode':
+                                CONFIG['hook_mode'] = value
+                            elif key == 'webhook_port' and isinstance(value, int):
+                                CONFIG['listen_port'] = value
+                
+                return config_path
+            except Exception as e:
+                pass  # Will log after logger is set up
+    
+    return None
+
+
+# Load config before setting up logging
+_config_file = load_config_file()
 
 # Setup logging
 logging.basicConfig(
@@ -54,6 +112,9 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger('AdaptiveFlowHook')
+
+if _config_file:
+    logger.info(f"Loaded config from {_config_file}")
 
 
 def send_console_message(message):
@@ -238,22 +299,33 @@ Examples:
   python3 moonraker_hook.py --provider ollama --auto-apply
         """
     )
-    parser.add_argument('--mode', choices=['webhook', 'poll'], default='poll',
-                        help='webhook=listen for notifications, poll=check print state')
-    parser.add_argument('--port', type=int, default=CONFIG['listen_port'],
-                        help='Port for webhook listener')
-    parser.add_argument('--auto-apply', action='store_true',
-                        help='Auto-apply safe suggestions')
+    
+    # Use config file defaults
+    default_mode = CONFIG.get('hook_mode', 'poll')
+    default_port = CONFIG.get('webhook_port', 7126)
+    default_auto_apply = CONFIG.get('auto_apply', False)
+    default_provider = CONFIG.get('provider')
+    
+    parser.add_argument('--mode', choices=['webhook', 'poll'], default=default_mode,
+                        help=f'webhook=listen for notifications, poll=check print state (default: {default_mode})')
+    parser.add_argument('--port', type=int, default=default_port,
+                        help=f'Port for webhook listener (default: {default_port})')
+    parser.add_argument('--auto-apply', action='store_true', default=default_auto_apply,
+                        help=f'Auto-apply safe suggestions (default: {default_auto_apply})')
     parser.add_argument('--provider', '-p',
                         choices=['openai', 'anthropic', 'gemini', 'github', 'ollama', 'openrouter'],
-                        help='LLM provider to use')
+                        default=default_provider,
+                        help='LLM provider to use (from config or env)')
     args = parser.parse_args()
     
     CONFIG['auto_apply'] = args.auto_apply
     CONFIG['listen_port'] = args.port
     CONFIG['provider'] = args.provider
     
-    provider_str = args.provider or 'default (set ADAPTIVE_FLOW_API_KEY)'
+    provider_str = args.provider or 'auto-detect from API key'
+    config_path = os.path.join(SCRIPT_DIR, 'analysis_config.cfg')
+    if os.path.exists(config_path):
+        logger.info(f"Config loaded from: {config_path}")
     logger.info(f"Starting Adaptive Flow hook (mode={args.mode}, provider={provider_str}, auto_apply={args.auto_apply})")
     
     if args.mode == 'webhook':
@@ -281,10 +353,12 @@ if __name__ == '__main__':
 """
 To run automatically on boot, create a systemd service:
 
-1. Create service file:
+1. Configure analysis_config.cfg with your API key and preferred settings
+
+2. Create service file:
    sudo nano /etc/systemd/system/adaptive-flow-hook.service
 
-2. Add this content:
+3. Add this content:
    [Unit]
    Description=Adaptive Flow Print Analyzer Hook
    After=moonraker.service
@@ -294,20 +368,21 @@ To run automatically on boot, create a systemd service:
    Type=simple
    User=pi
    WorkingDirectory=/home/pi/Klipper-Adaptive-Flow
-   Environment=ADAPTIVE_FLOW_API_KEY=your_key_here
-   ExecStart=/usr/bin/python3 /home/pi/Klipper-Adaptive-Flow/moonraker_hook.py --mode poll
+   ExecStart=/usr/bin/python3 /home/pi/Klipper-Adaptive-Flow/moonraker_hook.py
    Restart=always
    RestartSec=10
 
    [Install]
    WantedBy=multi-user.target
 
-3. Enable and start:
+   Note: All settings come from analysis_config.cfg - no need for Environment= lines
+
+4. Enable and start:
    sudo systemctl daemon-reload
    sudo systemctl enable adaptive-flow-hook
    sudo systemctl start adaptive-flow-hook
 
-4. Check status:
+5. Check status:
    sudo systemctl status adaptive-flow-hook
    journalctl -u adaptive-flow-hook -f
 """

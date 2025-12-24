@@ -77,7 +77,7 @@ PROVIDERS = {
 }
 
 # =============================================================================
-# CONFIGURATION - Edit these or use environment variables
+# CONFIGURATION - Loaded from analysis_config.cfg, env vars, or defaults
 # =============================================================================
 CONFIG = {
     # API Settings - these can be overridden by --provider flag
@@ -90,8 +90,89 @@ CONFIG = {
     'log_dir': os.path.expanduser('~/printer_data/logs/adaptive_flow'),
     
     # Printer connection (for auto-apply)
-    'moonraker_url': 'http://localhost:7125',  # or http://192.168.1.66:7125
+    'moonraker_url': 'http://localhost:7125',
+    
+    # Analysis settings
+    'analyze_klippy_log': True,
+    'max_csv_rows': 100,
 }
+
+
+def load_config_file():
+    """Load settings from analysis_config.cfg if it exists."""
+    config_paths = [
+        os.path.join(os.path.dirname(__file__), 'analysis_config.cfg'),
+        os.path.expanduser('~/Klipper-Adaptive-Flow/analysis_config.cfg'),
+        os.path.expanduser('~/printer_data/config/analysis_config.cfg'),
+    ]
+    
+    for config_path in config_paths:
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#') or line.startswith('['):
+                            continue
+                        if ':' in line:
+                            key, value = line.split(':', 1)
+                            key = key.strip()
+                            value = value.strip()
+                            
+                            # Skip empty values
+                            if not value:
+                                continue
+                            
+                            # Parse booleans
+                            if value.lower() == 'true':
+                                value = True
+                            elif value.lower() == 'false':
+                                value = False
+                            elif value.isdigit():
+                                value = int(value)
+                            
+                            # Map config keys to CONFIG dict
+                            if key == 'api_key':
+                                CONFIG['api_key'] = value
+                            elif key == 'model':
+                                CONFIG['model'] = value
+                            elif key == 'moonraker_url':
+                                CONFIG['moonraker_url'] = value
+                            elif key == 'log_dir':
+                                CONFIG['log_dir'] = os.path.expanduser(value)
+                            elif key == 'analyze_klippy_log':
+                                CONFIG['analyze_klippy_log'] = value
+                            elif key == 'max_csv_rows' and isinstance(value, int):
+                                CONFIG['max_csv_rows'] = value
+                
+                return config_path
+            except Exception as e:
+                print(f"Warning: Failed to load {config_path}: {e}")
+    
+    return None
+
+
+def get_config_provider():
+    """Get provider from config file."""
+    config_paths = [
+        os.path.join(os.path.dirname(__file__), 'analysis_config.cfg'),
+        os.path.expanduser('~/Klipper-Adaptive-Flow/analysis_config.cfg'),
+        os.path.expanduser('~/printer_data/config/analysis_config.cfg'),
+    ]
+    
+    for config_path in config_paths:
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith('provider:'):
+                            value = line.split(':', 1)[1].strip()
+                            if value and value in PROVIDERS:
+                                return value
+            except:
+                pass
+    return None
 
 
 def save_analysis_results(analysis, summary_file, provider, model):
@@ -498,6 +579,10 @@ def apply_suggestion(suggestion, moonraker_url):
 def main():
     import argparse
     
+    # Load config file first (sets defaults)
+    config_file = load_config_file()
+    config_provider = get_config_provider()
+    
     parser = argparse.ArgumentParser(
         description='Analyze Adaptive Flow print sessions using LLM',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -510,17 +595,20 @@ Providers:
   ollama      Local Ollama (free, no key needed)
   openrouter  Multi-model (set OPENROUTER_API_KEY)
 
+Configuration:
+  Edit analysis_config.cfg to set provider and API key, or use --provider flag.
+
 Examples:
-  python3 analyze_print.py --provider github
+  python3 analyze_print.py                     # Uses config file
+  python3 analyze_print.py --provider github   # Override provider
   python3 analyze_print.py --provider ollama --auto
-  GITHUB_TOKEN=ghp_xxx python3 analyze_print.py --provider github
         """
     )
     parser.add_argument('summary_file', nargs='?', help='Path to summary JSON (default: most recent)')
     parser.add_argument('--auto', action='store_true', help='Auto-apply safe suggestions')
     parser.add_argument('--raw', action='store_true', help='Show raw LLM response')
     parser.add_argument('--provider', '-p', choices=list(PROVIDERS.keys()),
-                        help='LLM provider to use (auto-configures API)')
+                        help='LLM provider to use (overrides config file)')
     parser.add_argument('--model', '-m', help='Override model name')
     parser.add_argument('--list-providers', action='store_true', help='Show available providers')
     args = parser.parse_args()
@@ -534,13 +622,20 @@ Examples:
             status = "✓ configured" if has_key or name == 'ollama' else "✗ no key"
             print(f"  {name:12} model: {info['model']:30} [{status}]")
             print(f"               keys: {key_vars}")
+        if config_file:
+            print(f"\nConfig file: {config_file}")
+            if config_provider:
+                print(f"Configured provider: {config_provider}")
         return 0
     
-    # Configure provider if specified
-    if args.provider:
-        if not configure_provider(args.provider):
+    # Configure provider: command line > config file > environment
+    provider = args.provider or config_provider
+    if provider:
+        if not configure_provider(provider):
             return 1
-        print(f"Using provider: {args.provider} (model: {CONFIG['model']})")
+        print(f"Using provider: {provider} (model: {CONFIG['model']})")
+        if config_file and not args.provider:
+            print(f"  (from {os.path.basename(config_file)})")
     
     # Override model if specified
     if args.model:

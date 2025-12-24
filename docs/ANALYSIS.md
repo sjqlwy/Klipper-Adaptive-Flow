@@ -24,6 +24,19 @@ python3 analyze_print.py --provider github   # Uses GitHub Models (free)
 
 ### Setting API Keys
 
+You can set API keys in two ways:
+
+**Option 1: Configuration File (Recommended)**
+
+Edit `analysis_config.cfg` in the project root:
+```ini
+[analysis]
+provider: github
+api_key: ghp_your_token_here
+```
+
+**Option 2: Environment Variables**
+
 ```bash
 # Add to ~/.bashrc or ~/.zshrc
 export GITHUB_TOKEN="ghp_your_token_here"
@@ -33,6 +46,51 @@ export OPENAI_API_KEY="sk-your-key-here"
 Or set before running:
 ```bash
 GITHUB_TOKEN=ghp_xxx python3 analyze_print.py --provider github
+```
+
+---
+
+## Configuration File
+
+All analysis settings can be configured in `analysis_config.cfg`:
+
+```ini
+[analysis]
+# LLM provider: github, ollama, openai, anthropic, gemini, openrouter
+provider: github
+
+# API key (overrides environment variables)
+api_key: 
+
+# Model name (optional - uses provider default if blank)
+model: 
+
+# Auto-apply safe suggestions
+auto_apply: false
+
+# Show analysis in Klipper console
+notify_console: true
+
+# Moonraker URL
+moonraker_url: http://localhost:7125
+
+# Hook mode: poll or webhook
+hook_mode: poll
+
+# Webhook port
+webhook_port: 7126
+
+# Log directory
+log_dir: ~/printer_data/logs/adaptive_flow
+
+# Max log files to keep
+max_log_files: 20
+
+# Include klippy.log in analysis
+analyze_klippy_log: true
+
+# Max CSV rows to send to LLM
+max_csv_rows: 100
 ```
 
 ---
@@ -132,7 +190,9 @@ Runs in foreground, polls Moonraker for print completion.
 
 ### Option 2: Systemd Service (Recommended)
 
-Create `/etc/systemd/system/adaptive-flow-hook.service`:
+1. Configure `analysis_config.cfg` with your API key and settings
+
+2. Create `/etc/systemd/system/adaptive-flow-hook.service`:
 
 ```ini
 [Unit]
@@ -144,8 +204,7 @@ Requires=moonraker.service
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/Klipper-Adaptive-Flow
-Environment=GITHUB_TOKEN=ghp_your_token_here
-ExecStart=/usr/bin/python3 /home/pi/Klipper-Adaptive-Flow/moonraker_hook.py --provider github
+ExecStart=/usr/bin/python3 /home/pi/Klipper-Adaptive-Flow/moonraker_hook.py
 Restart=always
 RestartSec=10
 
@@ -153,7 +212,9 @@ RestartSec=10
 WantedBy=multi-user.target
 ```
 
-Enable and start:
+Note: All settings (provider, auto-apply, etc.) come from `analysis_config.cfg`.
+
+3. Enable and start:
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable adaptive-flow-hook
