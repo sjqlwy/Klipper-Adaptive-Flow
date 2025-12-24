@@ -51,33 +51,6 @@ That's it! You'll see suggestions like:
 
 ## Alternative: Use Ollama (100% Local, No Internet)
 
-If you prefer to run AI locally on your own computer:
-
-### Step 1: Install Ollama
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-### Step 2: Download a Model
-
-```bash
-ollama pull llama3.1
-```
-
-This downloads about 4GB - only needed once.
-
-### Step 3: Configure
-
-Edit `analysis_config.cfg`:
-
-```ini
-[analysis]
-provider: ollama
-```
-
-No API key needed!
-
 **Running Ollama on another computer?** Add the URL:
 
 ```ini
