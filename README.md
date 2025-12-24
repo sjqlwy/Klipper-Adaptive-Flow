@@ -36,6 +36,8 @@ Add to `printer.cfg`:
 PRINT_START BED=[bed_temperature_initial_layer_single] EXTRUDER=[nozzle_temperature_initial_layer] MATERIAL={filament_type[0]}
 ```
 
+`{filament_type[0]}` is a built-in slicer variable that automatically passes the material type (PLA, PETG, ABS, etc.) from your filament profile. No manual setup needed — it just works.
+
 **End G-code:**
 ```gcode
 PRINT_END
@@ -53,16 +55,16 @@ Add `AT_START` after heating and `AT_END` at print end:
 [gcode_macro PRINT_START]
 gcode:
     # ... your heating, homing, leveling ...
-    AT_START                              # Enable adaptive flow
+    AT_START MATERIAL={params.MATERIAL|default("PLA")}   # Enable adaptive flow
 
 [gcode_macro PRINT_END]
 gcode:
-    AT_END                                # Stop loop, save learned values
+    AT_END                                # Disable adaptive flow
     TURN_OFF_HEATERS                      # Must come AFTER AT_END
     # ... your cooldown, park, etc ...
 ```
 
-MATERIAL is detected automatically from extruder temperature. For better accuracy, pass it from your slicer's start g-code (see Slicer Setup above).
+The `MATERIAL` parameter is passed from your slicer's start G-code (see above). If omitted, material is auto-detected from extruder temperature.
 
 > **Important:** Call `AT_END` *before* `TURN_OFF_HEATERS` to ensure the control loop stops first.
 
