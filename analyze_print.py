@@ -216,27 +216,34 @@ def configure_provider(provider_name):
     
     provider = PROVIDERS[provider_name]
     CONFIG['api_url'] = provider['api_url']
-    CONFIG['model'] = provider['model']
     CONFIG['format'] = provider['format']
+    
+    # Use model from config file if set, otherwise provider default
+    if not CONFIG.get('model'):
+        CONFIG['model'] = provider['model']
     
     # Use custom Ollama URL if configured
     if provider_name == 'ollama' and CONFIG.get('ollama_url'):
         ollama_base = CONFIG['ollama_url'].rstrip('/')
         CONFIG['api_url'] = f"{ollama_base}/v1/chat/completions"
     
-    # Find API key from environment
-    api_key = provider.get('default_key', '')
-    for env_var in provider.get('key_env', []):
-        key = os.environ.get(env_var, '')
-        if key:
-            api_key = key
-            break
+    # API key priority: config file > environment variable > default
+    # Config file key is already in CONFIG['api_key'] from load_config_file()
+    if not CONFIG.get('api_key'):
+        # Fall back to environment variables
+        for env_var in provider.get('key_env', []):
+            key = os.environ.get(env_var, '')
+            if key:
+                CONFIG['api_key'] = key
+                break
+        
+        # Last resort: provider default (e.g., 'ollama' for ollama provider)
+        if not CONFIG.get('api_key'):
+            CONFIG['api_key'] = provider.get('default_key', '')
     
-    CONFIG['api_key'] = api_key
-    
-    if not api_key and provider_name != 'ollama':
+    if not CONFIG.get('api_key') and provider_name != 'ollama':
         print(f"Warning: No API key found for {provider_name}")
-        print(f"Set one of: {', '.join(provider['key_env'])}")
+        print(f"Set 'api_key' in analysis_config.cfg or environment variable")
         return False
     
     return True
