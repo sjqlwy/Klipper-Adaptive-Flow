@@ -719,7 +719,7 @@ Examples:
     # Save analysis results
     provider_name = args.provider if args.provider else 'custom'
     model_name = CONFIG.get('model', 'unknown')
-    save_analysis_results(analysis, summary_file, provider_name, model_name)
+    save_analysis_results(analysis, summary_path, provider_name, model_name)
     
     # Display results
     print("\n" + "=" * 60)
