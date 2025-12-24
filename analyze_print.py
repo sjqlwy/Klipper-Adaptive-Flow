@@ -83,7 +83,7 @@ CONFIG = {
     # API Settings - these can be overridden by --provider flag
     'api_key': os.environ.get('ADAPTIVE_FLOW_API_KEY', ''),
     'api_url': os.environ.get('ADAPTIVE_FLOW_API_URL', 'https://api.openai.com/v1/chat/completions'),
-    'model': os.environ.get('ADAPTIVE_FLOW_MODEL', 'gpt-4o-mini'),
+    'model': '',  # Set by provider default or config file
     'format': 'openai',  # openai, anthropic, or gemini-native
     
     # Log directory
