@@ -181,14 +181,22 @@ def run_analysis(auto_apply=False, provider=None):
         if result.stderr:
             logger.warning(f"Stderr:\n{result.stderr}")
         
-        # Extract key info for console notification
+        # Send key results to Klipper console
         if CONFIG['notify_console']:
             lines = result.stdout.split('\n')
             for line in lines:
-                if 'Assessment:' in line or 'Quality Prediction:' in line:
-                    send_console_message(f"AF: {line.strip()}")
-                elif 'Issues Found' in line:
-                    send_console_message(f"AF: {line.strip()}")
+                # Skip decorative lines
+                if line.startswith('===') or line.startswith('---') or not line.strip():
+                    continue
+                # Send informative lines
+                if any(keyword in line for keyword in [
+                    'Quality:', 'ANALYSIS:', 'ALL GOOD', 'No issues',
+                    'critical issue', 'other issue', 'suggestion',
+                    'Report:', 'Mainsail:', '🎉', '✅', '⚠️', '❌', '🔴', '🟡', '💡'
+                ]):
+                    # Clean up line for console (remove emojis that may not render)
+                    clean_line = line.strip()
+                    send_console_message(f"AF: {clean_line}")
         
         return result.returncode == 0
         

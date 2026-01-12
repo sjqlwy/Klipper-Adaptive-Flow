@@ -862,40 +862,57 @@ Examples:
             print(f"\n📝 Notes: {notes}")
     else:
         # Brief summary (default)
-        print("\n" + "=" * 60)
-        print("ANALYSIS COMPLETE")
-        print("=" * 60)
-        
-        # One-line assessment
         quality = analysis.get('print_quality_prediction', 'unknown').upper()
-        quality_icon = '✅' if quality in ['EXCELLENT', 'GOOD'] else '⚠️' if quality == 'FAIR' else '❌'
-        print(f"\n{quality_icon} Quality: {quality}")
+        issues = analysis.get('issues', [])
+        suggestions = analysis.get('suggestions', [])
         
-        # Brief assessment (truncated if needed)
-        assessment = analysis.get('assessment', 'N/A')
-        if len(assessment) > 100:
-            assessment = assessment[:97] + "..."
-        print(f"   {assessment}")
-        
-        # Summary counts
-        print(f"\n📋 Summary:")
-        if high_issues:
-            print(f"   🔴 {len(high_issues)} critical issue(s)")
-        if len(issues) > len(high_issues):
-            print(f"   🟡 {len(issues) - len(high_issues)} other issue(s)")
-        if not issues:
-            print(f"   ✅ No issues detected")
-        
-        print(f"   💡 {len(suggestions)} suggestion(s) ({len(safe_suggestions)} safe to auto-apply)")
-        
-        # File location with Mainsail hint
-        print(f"\n📄 Full report saved:")
-        print(f"   {text_file}")
-        
-        # Show Mainsail path if in config folder
-        if 'printer_data/config' in text_file:
-            mainsail_path = text_file.split('printer_data/config/')[-1]
-            print(f"\n🌐 View in Mainsail: Machine → {mainsail_path.replace('/', ' → ')}")
+        if not issues and quality in ['EXCELLENT', 'GOOD']:
+            # All good - super brief output
+            print("\n" + "=" * 50)
+            print("✅ PRINT ANALYSIS: ALL GOOD!")
+            print("=" * 50)
+            print(f"\nQuality: {quality}")
+            print(f"No issues detected. Nice print! 🎉")
+            if suggestions:
+                print(f"\n💡 {len(suggestions)} optional suggestion(s) in full report")
+            print(f"\n📄 Report: {text_file}")
+        else:
+            # Issues found - show summary and point to report
+            print("\n" + "=" * 50)
+            quality_icon = '⚠️' if quality == 'FAIR' else '❌' if quality == 'POOR' else '✅'
+            print(f"{quality_icon} PRINT ANALYSIS: {quality}")
+            print("=" * 50)
+            
+            # Brief assessment
+            assessment = analysis.get('assessment', 'N/A')
+            if len(assessment) > 80:
+                assessment = assessment[:77] + "..."
+            print(f"\n{assessment}")
+            
+            # Issue summary
+            high_issues = [i for i in issues if i.get('severity', '').lower() == 'high']
+            if high_issues:
+                print(f"\n🔴 {len(high_issues)} critical issue(s):")
+                for issue in high_issues[:2]:  # Show max 2
+                    desc = issue.get('description', '')[:60]
+                    print(f"   • {desc}")
+                if len(high_issues) > 2:
+                    print(f"   ... and {len(high_issues) - 2} more")
+            
+            other_issues = len(issues) - len(high_issues)
+            if other_issues:
+                print(f"🟡 {other_issues} other issue(s)")
+            
+            if suggestions:
+                safe = len([s for s in suggestions if s.get('safe_to_auto_apply')])
+                print(f"\n💡 {len(suggestions)} suggestion(s) ({safe} safe to auto-apply)")
+            
+            print(f"\n📄 Full details: {text_file}")
+            
+            # Show Mainsail path if in config folder
+            if 'printer_data/config' in text_file:
+                mainsail_path = text_file.split('printer_data/config/')[-1]
+                print(f"🌐 Mainsail: Machine → {mainsail_path.replace('/', ' → ')}")
     
     # Auto-apply if requested
     if args.auto and suggestions:
