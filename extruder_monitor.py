@@ -487,7 +487,8 @@ class ExtruderMonitor:
                 # Write header
                 self._log_writer.writerow([
                     'elapsed_s', 'temp_actual', 'temp_target', 'boost',
-                    'flow', 'speed', 'pwm', 'pa', 'z_height', 'predicted_flow'
+                    'flow', 'speed', 'pwm', 'pa', 'z_height', 'predicted_flow',
+                    'dynz_active', 'accel'
                 ])
                 
                 self._log_start_time = time.time()
@@ -504,6 +505,8 @@ class ExtruderMonitor:
                     'flow_max': 0.0,
                     'speed_max': 0.0,
                     'thermal_lag_sum': 0.0,
+                    'dynz_active_samples': 0,
+                    'accel_min': 999999,
                 }
                 
                 gcmd.respond_info(f"AT_LOG: Started logging to {log_path}")
@@ -530,6 +533,8 @@ class ExtruderMonitor:
                 pa = gcmd.get_float('PA', 0.0)
                 z_height = gcmd.get_float('Z', 0.0)
                 predicted = gcmd.get_float('PREDICTED', 0.0)
+                dynz_active = gcmd.get_int('DYNZ', 0)
+                accel = gcmd.get_int('ACCEL', 0)
                 
                 self._log_writer.writerow([
                     f"{elapsed:.1f}",
@@ -541,7 +546,9 @@ class ExtruderMonitor:
                     f"{pwm:.3f}",
                     f"{pa:.4f}",
                     f"{z_height:.2f}",
-                    f"{predicted:.2f}"
+                    f"{predicted:.2f}",
+                    f"{dynz_active}",
+                    f"{accel}"
                 ])
                 
                 # Update running stats
@@ -554,6 +561,11 @@ class ExtruderMonitor:
                 self._log_stats['flow_max'] = max(self._log_stats['flow_max'], flow)
                 self._log_stats['speed_max'] = max(self._log_stats['speed_max'], speed)
                 self._log_stats['thermal_lag_sum'] += (temp_target - temp_actual)
+                # DynZ stats
+                if dynz_active:
+                    self._log_stats['dynz_active_samples'] += 1
+                if accel > 0:
+                    self._log_stats['accel_min'] = min(self._log_stats['accel_min'], accel)
                 
                 # Flush periodically
                 if self._log_sample_count % 60 == 0:
@@ -577,6 +589,10 @@ class ExtruderMonitor:
                 samples = self._log_sample_count
                 
                 if samples > 0:
+                    # Calculate DynZ stats
+                    dynz_active_pct = round(100.0 * self._log_stats['dynz_active_samples'] / samples, 1)
+                    accel_min = self._log_stats['accel_min'] if self._log_stats['accel_min'] < 999999 else 0
+                    
                     summary = {
                         'material': self._log_stats['material'],
                         'filename': self._log_stats['filename'],
@@ -592,6 +608,8 @@ class ExtruderMonitor:
                         'max_flow': round(self._log_stats['flow_max'], 2),
                         'max_speed': round(self._log_stats['speed_max'], 1),
                         'avg_thermal_lag': round(self._log_stats['thermal_lag_sum'] / samples, 2),
+                        'dynz_active_pct': dynz_active_pct,
+                        'accel_min': accel_min,
                     }
                     
                     # Write summary JSON

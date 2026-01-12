@@ -154,8 +154,15 @@ def get_config_provider():
 
 
 def save_analysis_results(analysis, summary_file, provider, model):
-    """Save analysis results to a JSON file alongside the print data."""
+    """Save analysis results to JSON and human-readable text files."""
     try:
+        # Use report_dir if configured, otherwise fall back to log_dir
+        report_dir = CONFIG.get('report_dir', CONFIG['log_dir'])
+        report_dir = os.path.expanduser(report_dir)
+        
+        # Create report directory if it doesn't exist
+        os.makedirs(report_dir, exist_ok=True)
+        
         # Create analysis filename based on the print summary file
         # IMPORTANT: Must create a DIFFERENT filename to avoid overwriting the original summary
         if summary_file:
@@ -169,7 +176,8 @@ def save_analysis_results(analysis, summary_file, provider, model):
         else:
             base_name = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        analysis_file = os.path.join(CONFIG['log_dir'], f"{base_name}.json")
+        json_file = os.path.join(report_dir, f"{base_name}.json")
+        text_file = os.path.join(report_dir, f"{base_name}.txt")
         
         # Add metadata
         result = {
@@ -180,14 +188,71 @@ def save_analysis_results(analysis, summary_file, provider, model):
             'analysis': analysis
         }
         
-        with open(analysis_file, 'w') as f:
+        # Save JSON
+        with open(json_file, 'w') as f:
             json.dump(result, f, indent=2)
         
-        print(f"\n💾 Analysis saved to: {analysis_file}")
-        return analysis_file
+        # Save human-readable text report
+        with open(text_file, 'w') as f:
+            f.write("=" * 70 + "\n")
+            f.write("ADAPTIVE FLOW PRINT ANALYSIS REPORT\n")
+            f.write("=" * 70 + "\n\n")
+            f.write(f"Analyzed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Provider: {provider} ({model})\n")
+            f.write(f"Source: {os.path.basename(summary_file) if summary_file else 'N/A'}\n\n")
+            
+            f.write("-" * 70 + "\n")
+            f.write("ASSESSMENT\n")
+            f.write("-" * 70 + "\n")
+            f.write(f"{analysis.get('assessment', 'N/A')}\n\n")
+            f.write(f"Quality Prediction: {analysis.get('print_quality_prediction', 'N/A').upper()}\n\n")
+            
+            issues = analysis.get('issues', [])
+            if issues:
+                f.write("-" * 70 + "\n")
+                f.write(f"ISSUES ({len(issues)})\n")
+                f.write("-" * 70 + "\n")
+                for issue in issues:
+                    severity = issue.get('severity', 'unknown').upper()
+                    f.write(f"[{severity}] {issue.get('description', '')}\n")
+                f.write("\n")
+            
+            suggestions = analysis.get('suggestions', [])
+            if suggestions:
+                f.write("-" * 70 + "\n")
+                f.write(f"SUGGESTIONS ({len(suggestions)})\n")
+                f.write("-" * 70 + "\n")
+                for i, sug in enumerate(suggestions, 1):
+                    safe = "SAFE TO AUTO-APPLY" if sug.get('safe_to_auto_apply') else "MANUAL REVIEW REQUIRED"
+                    f.write(f"\n{i}. {sug.get('parameter', 'unknown')}\n")
+                    f.write(f"   Current: {sug.get('current', '?')}\n")
+                    f.write(f"   Suggested: {sug.get('suggested', '?')}\n")
+                    f.write(f"   Reason: {sug.get('reason', '')}\n")
+                    f.write(f"   [{safe}]\n")
+                f.write("\n")
+            
+            klippy_concerns = analysis.get('klippy_concerns', '')
+            if klippy_concerns and klippy_concerns.lower() != 'none':
+                f.write("-" * 70 + "\n")
+                f.write("KLIPPER LOG CONCERNS\n")
+                f.write("-" * 70 + "\n")
+                f.write(f"{klippy_concerns}\n\n")
+            
+            notes = analysis.get('notes', '')
+            if notes:
+                f.write("-" * 70 + "\n")
+                f.write("NOTES\n")
+                f.write("-" * 70 + "\n")
+                f.write(f"{notes}\n\n")
+            
+            f.write("=" * 70 + "\n")
+            f.write("END OF REPORT\n")
+            f.write("=" * 70 + "\n")
+        
+        return text_file, json_file
     except Exception as e:
         print(f"\n⚠️  Failed to save analysis: {e}")
-        return None
+        return None, None
 
 
 def configure_provider(provider_name):
@@ -232,6 +297,7 @@ The Adaptive Flow system dynamically adjusts extruder temperature based on:
 - **Flow boost**: Temperature increases with volumetric flow (mm³/s)
 - **Speed boost**: Extra heating for high linear speeds (>100mm/s)
 - **Dynamic PA**: Pressure Advance scales with temperature boost
+- **Dynamic Z-Window (DynZ)**: Learns stress zones (convex surfaces) and reduces acceleration
 
 ## Current Configuration
 - speed_boost_k: 0.08 (°C per mm/s above 100mm/s threshold)
@@ -239,6 +305,7 @@ The Adaptive Flow system dynamically adjusts extruder temperature based on:
 - Loop interval: 1 second
 - Ramp rate (rise): 4.0°C/s
 - Ramp rate (fall): 1.0°C/s for PLA, 1.5°C/s for PETG
+- DynZ: Reduces accel to 3200mm/s² when stress detected
 
 ## Print Session Data
 ```json
@@ -246,6 +313,7 @@ The Adaptive Flow system dynamically adjusts extruder temperature based on:
 ```
 
 ## Detailed CSV Sample (last 100 rows if available)
+The CSV includes columns: elapsed_s, temp_actual, temp_target, boost, flow, speed, pwm, pa, z_height, predicted_flow, dynz_active (0/1), accel
 ```csv
 {csv_sample}
 ```
@@ -262,7 +330,8 @@ Relevant warnings/errors from klippy.log during this print:
 3. **Under-extrusion Risk**: High speed + low boost = possible under-extrusion
 4. **Over-heating Risk**: High boost + high PWM = heater saturated
 5. **PA Adjustment**: Is dynamic PA helping or hurting?
-6. **Klipper Issues**: Any timing, communication, or hardware issues in the log?
+6. **DynZ Effectiveness**: Check dynz_active_pct - if high (>10%), stress zones were detected. If accel_min is low, relief was applied.
+7. **Klipper Issues**: Any timing, communication, or hardware issues in the log?
 
 ## Output Format
 Provide your analysis in this exact JSON format:
@@ -292,6 +361,7 @@ Be specific with parameter names that match the auto_flow.cfg variables:
 - ramp_rate_rise, ramp_rate_fall
 - max_boost_limit
 - flow_smoothing
+- dynz_enable, dynz_accel_relief, dynz_activate_score
 
 Only mark safe_to_auto_apply=true for conservative changes that won't cause print failures."""
 
@@ -619,6 +689,7 @@ Examples:
     parser.add_argument('summary_file', nargs='?', help='Path to summary JSON (default: most recent)')
     parser.add_argument('--auto', action='store_true', help='Auto-apply safe suggestions')
     parser.add_argument('--raw', action='store_true', help='Show raw LLM response')
+    parser.add_argument('--verbose', '-v', action='store_true', help='Show full analysis in console (default: brief summary)')
     parser.add_argument('--provider', '-p', choices=list(PROVIDERS.keys()),
                         help='LLM provider to use (overrides config file)')
     parser.add_argument('--model', '-m', help='Override model name')
@@ -697,6 +768,14 @@ Examples:
     print(f"Avg Boost: {summary.get('avg_boost', 0)}°C, Max: {summary.get('max_boost', 0)}°C")
     print(f"Avg PWM: {summary.get('avg_pwm', 0):.1%}, Max: {summary.get('max_pwm', 0):.1%}")
     
+    # DynZ stats
+    dynz_pct = summary.get('dynz_active_pct', 0)
+    accel_min = summary.get('accel_min', 0)
+    if dynz_pct > 0:
+        print(f"DynZ Active: {dynz_pct}% of print, Min Accel: {accel_min} mm/s²")
+    else:
+        print(f"DynZ Active: 0% (no stress zones detected)")
+    
     # Show klippy issues if any
     if "No issues" not in klippy_issues and "not found" not in klippy_issues:
         issue_count = klippy_issues.count('\n') + 1
@@ -727,42 +806,82 @@ Examples:
     # Save analysis results
     provider_name = args.provider or config_provider or 'custom'
     model_name = CONFIG.get('model', 'unknown')
-    save_analysis_results(analysis, summary_path, provider_name, model_name)
+    text_file, json_file = save_analysis_results(analysis, summary_path, provider_name, model_name)
     
-    # Display results
-    print("\n" + "=" * 60)
-    print("ANALYSIS RESULTS")
-    print("=" * 60)
-    
-    print(f"\n📊 Assessment: {analysis.get('assessment', 'N/A')}")
-    print(f"🎯 Quality Prediction: {analysis.get('print_quality_prediction', 'N/A').upper()}")
-    
+    # Count issues and suggestions for summary
     issues = analysis.get('issues', [])
-    if issues:
-        print(f"\n⚠️  Issues Found ({len(issues)}):")
-        for issue in issues:
-            severity = issue.get('severity', 'unknown').upper()
-            icon = '🔴' if severity == 'HIGH' else '🟡' if severity == 'MEDIUM' else '🟢'
-            print(f"  {icon} [{severity}] {issue.get('description', '')}")
-    
-    # Show klippy concerns from log analysis
-    klippy_concerns = analysis.get('klippy_concerns', '')
-    if klippy_concerns and klippy_concerns.lower() != 'none':
-        print(f"\n🔧 Klipper Log Concerns: {klippy_concerns}")
-    
     suggestions = analysis.get('suggestions', [])
-    if suggestions:
-        print(f"\n💡 Suggestions ({len(suggestions)}):")
-        for i, sug in enumerate(suggestions, 1):
-            safe = "✓ SAFE" if sug.get('safe_to_auto_apply') else "⚠ MANUAL"
-            print(f"\n  {i}. {sug.get('parameter', 'unknown')}")
-            print(f"     Current: {sug.get('current', '?')} → Suggested: {sug.get('suggested', '?')}")
-            print(f"     Reason: {sug.get('reason', '')}")
-            print(f"     [{safe}]")
+    safe_suggestions = [s for s in suggestions if s.get('safe_to_auto_apply')]
+    high_issues = [i for i in issues if i.get('severity', '').lower() == 'high']
     
-    notes = analysis.get('notes', '')
-    if notes:
-        print(f"\n📝 Notes: {notes}")
+    if args.verbose:
+        # Full console output (original behavior)
+        print("\n" + "=" * 60)
+        print("ANALYSIS RESULTS")
+        print("=" * 60)
+        
+        print(f"\n📊 Assessment: {analysis.get('assessment', 'N/A')}")
+        print(f"🎯 Quality Prediction: {analysis.get('print_quality_prediction', 'N/A').upper()}")
+        
+        if issues:
+            print(f"\n⚠️  Issues Found ({len(issues)}):")
+            for issue in issues:
+                severity = issue.get('severity', 'unknown').upper()
+                icon = '🔴' if severity == 'HIGH' else '🟡' if severity == 'MEDIUM' else '🟢'
+                print(f"  {icon} [{severity}] {issue.get('description', '')}")
+        
+        klippy_concerns = analysis.get('klippy_concerns', '')
+        if klippy_concerns and klippy_concerns.lower() != 'none':
+            print(f"\n🔧 Klipper Log Concerns: {klippy_concerns}")
+        
+        if suggestions:
+            print(f"\n💡 Suggestions ({len(suggestions)}):")
+            for i, sug in enumerate(suggestions, 1):
+                safe = "✓ SAFE" if sug.get('safe_to_auto_apply') else "⚠ MANUAL"
+                print(f"\n  {i}. {sug.get('parameter', 'unknown')}")
+                print(f"     Current: {sug.get('current', '?')} → Suggested: {sug.get('suggested', '?')}")
+                print(f"     Reason: {sug.get('reason', '')}")
+                print(f"     [{safe}]")
+        
+        notes = analysis.get('notes', '')
+        if notes:
+            print(f"\n📝 Notes: {notes}")
+    else:
+        # Brief summary (default)
+        print("\n" + "=" * 60)
+        print("ANALYSIS COMPLETE")
+        print("=" * 60)
+        
+        # One-line assessment
+        quality = analysis.get('print_quality_prediction', 'unknown').upper()
+        quality_icon = '✅' if quality in ['EXCELLENT', 'GOOD'] else '⚠️' if quality == 'FAIR' else '❌'
+        print(f"\n{quality_icon} Quality: {quality}")
+        
+        # Brief assessment (truncated if needed)
+        assessment = analysis.get('assessment', 'N/A')
+        if len(assessment) > 100:
+            assessment = assessment[:97] + "..."
+        print(f"   {assessment}")
+        
+        # Summary counts
+        print(f"\n📋 Summary:")
+        if high_issues:
+            print(f"   🔴 {len(high_issues)} critical issue(s)")
+        if len(issues) > len(high_issues):
+            print(f"   🟡 {len(issues) - len(high_issues)} other issue(s)")
+        if not issues:
+            print(f"   ✅ No issues detected")
+        
+        print(f"   💡 {len(suggestions)} suggestion(s) ({len(safe_suggestions)} safe to auto-apply)")
+        
+        # File location with Mainsail hint
+        print(f"\n📄 Full report saved:")
+        print(f"   {text_file}")
+        
+        # Show Mainsail path if in config folder
+        if 'printer_data/config' in text_file:
+            mainsail_path = text_file.split('printer_data/config/')[-1]
+            print(f"\n🌐 View in Mainsail: Machine → {mainsail_path.replace('/', ' → ')}")
     
     # Auto-apply if requested
     if args.auto and suggestions:
