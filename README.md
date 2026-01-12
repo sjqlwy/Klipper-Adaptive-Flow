@@ -6,6 +6,7 @@ Automatic temperature and pressure advance control for E3D Revo hotends on Klipp
 
 - **Dynamic temperature** — flow/speed/acceleration-based boost
 - **Dynamic PA** — scales with temperature boost automatically
+- **Smart Cooling** — adjusts part fan based on flow rate and layer time
 - **5-second lookahead** — pre-heats before flow spikes
 - **Dynamic Z-Window (DynZ)** — learns and adapts to convex surfaces
 - **Per-material profiles** — PLA, PETG, ABS, ASA, TPU, Nylon, PC, HIPS (user-editable)
@@ -99,6 +100,7 @@ variable_ramp_fall: 1.5         # Cool down rate (°C/s)
 |---------|-------------|
 | `AT_STATUS` | Show current state, flow, boost, PA |
 | `AT_DYNZ_STATUS` | Show Dynamic Z-Window learning state |
+| `AT_SC_STATUS` | Show Smart Cooling status |
 | `AT_SET_PA MATERIAL=X PA=Y` | Save calibrated PA |
 | `AT_LIST_PA` | Show all PA values |
 
@@ -176,6 +178,72 @@ Z Bin: 45 (bin height 1.0 mm)
 Bin Score: 5.23
 Accel (current): 3200 mm/s²
 Mode: CLAMPING (convex stress detected)
+```
+
+## Smart Cooling
+
+Smart Cooling automatically adjusts the part cooling fan based on flow rate and layer time, optimizing print quality without manual fan speed management.
+
+### How It Works
+
+1. **Flow-based reduction**: At high flow rates, the fast-moving plastic creates its own airflow and needs less fan cooling. Smart Cooling reduces fan speed proportionally.
+
+2. **Layer time boost**: Short layers (fast prints or small features) don't have enough time to cool between layers. Smart Cooling increases fan speed for these quick layers.
+
+3. **Material awareness**: Each material profile has its own cooling preferences (PLA wants high cooling, ABS wants minimal).
+
+### Configuration
+
+Smart Cooling is enabled by default. To customize, edit `auto_flow.cfg`:
+
+```ini
+# Enable/disable Smart Cooling
+variable_sc_enable: True
+
+# Flow threshold where cooling reduction starts (mm³/s)
+variable_sc_flow_gate: 8.0
+
+# Fan reduction per mm³/s above flow_gate (0-1 scale)
+variable_sc_flow_k: 0.03
+
+# Layer time threshold - layers faster than this get extra cooling
+variable_sc_short_layer_time: 15.0
+
+# Min/max fan limits (0.0-1.0 = 0-100%)
+variable_sc_min_fan: 0.20
+variable_sc_max_fan: 1.00
+
+# First layer fan (usually 0 for bed adhesion)
+variable_sc_first_layer_fan: 0.0
+```
+
+### Material Profile Overrides
+
+Each material in `material_profiles.cfg` has its own cooling settings:
+
+| Material | Min Fan | Max Fan | Notes |
+|----------|---------|---------|-------|
+| PLA | 50% | 100% | Needs aggressive cooling |
+| PETG | 30% | 70% | Too much causes layer adhesion issues |
+| ABS/ASA | 0% | 40% | Minimal cooling to prevent warping |
+| TPU | 10% | 50% | Low cooling for layer adhesion |
+| Nylon | 10% | 50% | Warps easily with too much cooling |
+| PC | 0% | 30% | Very low cooling, high temps |
+
+### Monitoring
+
+Check Smart Cooling status during a print:
+```
+AT_SC_STATUS
+```
+
+Output:
+```
+Smart Cooling: ENABLED
+Current Fan: 65%
+Layer Time: 12.3s
+Fan Range: 30% - 70%
+Flow Gate: 10.0 mm³/s
 ```
 
 ## Optional: Print Analysis
