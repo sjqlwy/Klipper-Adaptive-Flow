@@ -7,6 +7,7 @@ Automatic temperature and pressure advance control for E3D Revo hotends on Klipp
 - **Dynamic temperature** — flow/speed/acceleration-based boost
 - **Dynamic PA** — scales with temperature boost automatically
 - **5-second lookahead** — pre-heats before flow spikes
+- **Dynamic Z-Window (DynZ)** — learns and adapts to convex surfaces
 - **Per-material profiles** — PLA, PETG, ABS, ASA, TPU, Nylon, PC, HIPS (user-editable)
 - **First layer skip** — consistent squish on layer 1
 - **Heater monitoring** — won't request more than your heater can deliver
@@ -97,6 +98,7 @@ variable_ramp_fall: 1.5         # Cool down rate (°C/s)
 | Command | Description |
 |---------|-------------|
 | `AT_STATUS` | Show current state, flow, boost, PA |
+| `AT_DYNZ_STATUS` | Show Dynamic Z-Window learning state |
 | `AT_SET_PA MATERIAL=X PA=Y` | Save calibrated PA |
 | `AT_LIST_PA` | Show all PA values |
 
@@ -111,6 +113,69 @@ Example during a print:
 ```
 Base temp: 230°C, Base PA: 0.060
 High flow detected → Boost +20°C → Temp 250°C, PA 0.048
+```
+
+## Dynamic Z-Window (DynZ)
+
+DynZ is an intelligent learning system that detects and adapts to challenging print geometries like convex surfaces, domes, and spheres.
+
+### The Problem
+
+Convex surfaces create "stress zones" where:
+- High toolhead speed (rapid direction changes)
+- Low volumetric flow (short segments)
+- High heater demand (constant temp adjustments)
+
+This combination can cause thermal lag, inconsistent extrusion, and surface artifacts.
+
+### How DynZ Works
+
+1. **Learning**: DynZ divides Z-height into bins (default 1mm) and tracks stress conditions in each
+2. **Detection**: When speed is high, flow is low, and heater PWM is high simultaneously, it's flagged as stress
+3. **Scoring**: Each Z bin accumulates a stress score over time (scores decay when conditions improve)
+4. **Relief**: When a bin's score exceeds the threshold, DynZ reduces acceleration to ease thermal demand
+5. **Memory**: Stress patterns persist across layers, so the system "remembers" where domes start
+
+### Configuration
+
+DynZ is enabled by default. To customize, edit `auto_flow.cfg`:
+
+```ini
+# Enable/disable DynZ
+variable_dynz_enable: True
+
+# Z bin size (1.0mm = stable, 0.5mm = more sensitive)
+variable_dynz_bin_height: 1.0
+
+# Stress detection thresholds
+variable_dynz_speed_thresh: 80.0      # mm/s toolhead speed
+variable_dynz_flow_max: 8.0           # mm³/s volumetric flow
+variable_dynz_pwm_thresh: 0.70        # heater duty cycle (0-1)
+
+# Score thresholds
+variable_dynz_activate_score: 4.0     # score to trigger relief
+variable_dynz_deactivate_score: 1.5   # score to exit relief
+
+# Acceleration during stress relief
+variable_dynz_accel_relief: 3200      # mm/s² (lower = gentler moves)
+```
+
+### Monitoring
+
+Check DynZ status during a print:
+```
+AT_DYNZ_STATUS
+```
+
+Output:
+```
+DynZ: ENABLED
+State: ACTIVE (accel relief applied)
+Z Height: 45.20 mm
+Z Bin: 45 (bin height 1.0 mm)
+Bin Score: 5.23
+Accel (current): 3200 mm/s²
+Mode: CLAMPING (convex stress detected)
 ```
 
 ## Optional: Print Analysis

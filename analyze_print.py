@@ -25,6 +25,7 @@ import sys
 import json
 import glob
 import csv
+import urllib.parse
 from datetime import datetime
 
 # =============================================================================
@@ -156,8 +157,15 @@ def save_analysis_results(analysis, summary_file, provider, model):
     """Save analysis results to a JSON file alongside the print data."""
     try:
         # Create analysis filename based on the print summary file
+        # IMPORTANT: Must create a DIFFERENT filename to avoid overwriting the original summary
         if summary_file:
-            base_name = os.path.basename(summary_file).replace('print_', 'analysis_').replace('.json', '')
+            base_name = os.path.basename(summary_file)
+            # Remove the _summary.json suffix first, then add analysis_ prefix
+            if '_summary.json' in base_name:
+                base_name = base_name.replace('_summary.json', '')
+            else:
+                base_name = base_name.replace('.json', '')
+            base_name = f"analysis_{base_name}"
         else:
             base_name = f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
@@ -289,9 +297,33 @@ Only mark safe_to_auto_apply=true for conservative changes that won't cause prin
 
 
 def load_summary(summary_path):
-    """Load summary JSON file."""
+    """Load summary JSON file and validate it contains print data."""
     with open(summary_path, 'r') as f:
-        return json.load(f)
+        data = json.load(f)
+    
+    # Check if this is an analysis result file (corrupted/overwritten) instead of print data
+    if 'analyzed_at' in data or 'analysis' in data:
+        print(f"\n⚠️  WARNING: This file appears to be an analysis result, not print data!")
+        print(f"   The original print summary may have been overwritten.")
+        print(f"   Looking for the original summary data...")
+        
+        # Try to extract source file reference if available
+        if 'source_file' in data and data['source_file']:
+            print(f"   Original source: {data['source_file']}")
+        
+        # Return empty structure with clear indicators
+        return {
+            'material': 'CORRUPTED_FILE',
+            'samples': 0,
+            'duration_min': 0,
+            'avg_boost': 0,
+            'max_boost': 0,
+            'avg_pwm': 0,
+            'max_pwm': 0,
+            '_error': 'This file contains analysis results, not print data. Run a new print to generate fresh data.'
+        }
+    
+    return data
 
 
 def load_csv_sample(csv_path, max_rows=100):
@@ -335,6 +367,9 @@ def extract_klippy_issues(start_time_str, duration_min):
     # Parse start time
     try:
         start_dt = datetime.fromisoformat(start_time_str.replace('Z', '+00:00'))
+        # Remove timezone info for comparison with naive timestamps from log
+        if start_dt.tzinfo is not None:
+            start_dt = start_dt.replace(tzinfo=None)
     except:
         return "Could not parse print start time"
     
@@ -633,8 +668,22 @@ Examples:
     
     # Load data
     summary = load_summary(summary_path)
+    
+    # Check for corrupted/overwritten file
+    if summary.get('_error'):
+        print(f"\n❌ ERROR: {summary['_error']}")
+        print("\nThis can happen if a previous version of the script overwrote the summary file.")
+        print("To fix: Run a new print to generate fresh logging data.")
+        return 1
+    
+    # Validate we have actual data
+    if summary.get('samples', 0) == 0:
+        print(f"\n⚠️  WARNING: Summary file contains 0 samples!")
+        print("   This print may have been too short, or logging wasn't active.")
+        print("   Make sure AT_START is called at print start and AT_END at print end.")
+    
     csv_path = summary_path.replace('_summary.json', '.csv')
-    csv_sample = load_csv_sample(csv_path)
+    csv_sample = load_csv_sample(csv_path, CONFIG.get('max_csv_rows', 100))
     
     # Extract klippy.log issues for this print
     start_time = summary.get('start_time', '')
@@ -676,7 +725,7 @@ Examples:
         return 1
     
     # Save analysis results
-    provider_name = args.provider if args.provider else 'custom'
+    provider_name = args.provider or config_provider or 'custom'
     model_name = CONFIG.get('model', 'unknown')
     save_analysis_results(analysis, summary_path, provider_name, model_name)
     
@@ -719,8 +768,6 @@ Examples:
     if args.auto and suggestions:
         print("\n" + "-" * 60)
         print("AUTO-APPLYING SAFE SUGGESTIONS...")
-        
-        import urllib.parse
         
         for sug in suggestions:
             if sug.get('safe_to_auto_apply'):
