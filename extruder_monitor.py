@@ -493,23 +493,57 @@ class ExtruderMonitor:
                 
                 self._log_start_time = time.time()
                 self._log_sample_count = 0
+                
+                # Parse optional feature flags
+                at_enabled = gcmd.get_int('AT_ENABLED', 1)
+                dynz_enabled = gcmd.get_int('DYNZ_ENABLED', 1)
+                sc_enabled = gcmd.get_int('SC_ENABLED', 1)
+                pa_enabled = gcmd.get_int('PA_ENABLED', 1)
+                
                 self._log_stats = {
                     'material': material,
                     'filename': filename,
                     'start_time': datetime.now().isoformat(),
+                    # Feature flags
+                    'features': {
+                        'auto_temp': bool(at_enabled),
+                        'dynamic_pa': bool(pa_enabled),
+                        'smart_cooling': bool(sc_enabled),
+                        'dynamic_z': bool(dynz_enabled),
+                    },
+                    # Temp boost stats
                     'boost_sum': 0.0,
                     'boost_max': 0.0,
+                    'boost_count': 0,  # samples with boost > 0
+                    # Heater stats
                     'pwm_sum': 0.0,
                     'pwm_max': 0.0,
+                    'pwm_at_1_count': 0,  # samples with pwm at 1.0
+                    # Temperature stats
+                    'temp_min': 999.0,
+                    'temp_max': 0.0,
+                    'temp_sum': 0.0,
+                    'temp_target_max': 0.0,
+                    # Flow stats
                     'flow_sum': 0.0,
                     'flow_max': 0.0,
                     'speed_max': 0.0,
+                    # PA stats
+                    'pa_min': 999.0,
+                    'pa_max': 0.0,
+                    'pa_sum': 0.0,
+                    # Thermal lag
                     'thermal_lag_sum': 0.0,
+                    'thermal_lag_max': 0.0,
+                    # DynZ stats
                     'dynz_active_samples': 0,
                     'accel_min': 999999,
+                    # Fan/Smart Cooling stats
                     'fan_sum': 0.0,
                     'fan_min': 100,
                     'fan_max': 0,
+                    'fan_adjustments': 0,  # times fan changed from previous sample
+                    'last_fan': -1,  # for tracking adjustments
                 }
                 
                 gcmd.respond_info(f"AT_LOG: Started logging to {log_path}")
@@ -558,23 +592,55 @@ class ExtruderMonitor:
                 
                 # Update running stats
                 self._log_sample_count += 1
+                
+                # Boost stats
                 self._log_stats['boost_sum'] += boost
                 self._log_stats['boost_max'] = max(self._log_stats['boost_max'], boost)
+                if boost > 0:
+                    self._log_stats['boost_count'] += 1
+                
+                # PWM stats
                 self._log_stats['pwm_sum'] += pwm
                 self._log_stats['pwm_max'] = max(self._log_stats['pwm_max'], pwm)
+                if pwm >= 0.999:
+                    self._log_stats['pwm_at_1_count'] += 1
+                
+                # Temperature stats
+                if temp_actual > 50:  # Only track when extruder is hot
+                    self._log_stats['temp_min'] = min(self._log_stats['temp_min'], temp_actual)
+                    self._log_stats['temp_max'] = max(self._log_stats['temp_max'], temp_actual)
+                    self._log_stats['temp_sum'] += temp_actual
+                self._log_stats['temp_target_max'] = max(self._log_stats['temp_target_max'], temp_target)
+                
+                # Flow stats
                 self._log_stats['flow_sum'] += flow
                 self._log_stats['flow_max'] = max(self._log_stats['flow_max'], flow)
                 self._log_stats['speed_max'] = max(self._log_stats['speed_max'], speed)
-                self._log_stats['thermal_lag_sum'] += (temp_target - temp_actual)
+                
+                # PA stats
+                if pa > 0:
+                    self._log_stats['pa_min'] = min(self._log_stats['pa_min'], pa)
+                    self._log_stats['pa_max'] = max(self._log_stats['pa_max'], pa)
+                    self._log_stats['pa_sum'] += pa
+                
+                # Thermal lag stats
+                thermal_lag = temp_target - temp_actual
+                self._log_stats['thermal_lag_sum'] += thermal_lag
+                self._log_stats['thermal_lag_max'] = max(self._log_stats['thermal_lag_max'], thermal_lag)
+                
                 # DynZ stats
                 if dynz_active:
                     self._log_stats['dynz_active_samples'] += 1
                 if accel > 0:
                     self._log_stats['accel_min'] = min(self._log_stats['accel_min'], accel)
-                # Fan stats
+                
+                # Fan/Smart Cooling stats
                 self._log_stats['fan_sum'] += fan_pct
                 self._log_stats['fan_min'] = min(self._log_stats['fan_min'], fan_pct)
                 self._log_stats['fan_max'] = max(self._log_stats['fan_max'], fan_pct)
+                if self._log_stats['last_fan'] >= 0 and abs(fan_pct - self._log_stats['last_fan']) >= 3:
+                    self._log_stats['fan_adjustments'] += 1
+                self._log_stats['last_fan'] = fan_pct
                 
                 # Flush periodically
                 if self._log_sample_count % 60 == 0:
@@ -598,21 +664,81 @@ class ExtruderMonitor:
                 samples = self._log_sample_count
                 
                 if samples > 0:
-                    # Calculate DynZ stats
+                    # Build comprehensive summary organized by feature
+                    features = self._log_stats.get('features', {})
+                    
+                    # Calculate derived stats
                     dynz_active_pct = round(100.0 * self._log_stats['dynz_active_samples'] / samples, 1)
                     accel_min = self._log_stats['accel_min'] if self._log_stats['accel_min'] < 999999 else 0
-                    # Calculate fan stats
-                    fan_avg = round(self._log_stats['fan_sum'] / samples, 1)
-                    fan_min = self._log_stats['fan_min']
-                    fan_max = self._log_stats['fan_max']
+                    boost_active_pct = round(100.0 * self._log_stats['boost_count'] / samples, 1)
+                    pwm_maxed_pct = round(100.0 * self._log_stats['pwm_at_1_count'] / samples, 1)
+                    temp_min = self._log_stats['temp_min'] if self._log_stats['temp_min'] < 999 else 0
+                    temp_range = round(self._log_stats['temp_max'] - temp_min, 1) if temp_min > 0 else 0
+                    pa_min = self._log_stats['pa_min'] if self._log_stats['pa_min'] < 999 else 0
+                    pa_range = round(self._log_stats['pa_max'] - pa_min, 4) if pa_min > 0 else 0
                     
                     summary = {
+                        # Session info
                         'material': self._log_stats['material'],
                         'filename': self._log_stats['filename'],
                         'start_time': self._log_stats['start_time'],
                         'end_time': datetime.now().isoformat(),
                         'duration_min': round(duration_s / 60, 1),
                         'samples': samples,
+                        
+                        # Features enabled
+                        'features': features,
+                        
+                        # Auto-Temperature stats
+                        'auto_temp': {
+                            'avg_boost': round(self._log_stats['boost_sum'] / samples, 2),
+                            'max_boost': round(self._log_stats['boost_max'], 1),
+                            'boost_active_pct': boost_active_pct,
+                            'temp_min': round(temp_min, 1),
+                            'temp_max': round(self._log_stats['temp_max'], 1),
+                            'temp_range': temp_range,
+                            'temp_target_max': round(self._log_stats['temp_target_max'], 1),
+                            'avg_thermal_lag': round(self._log_stats['thermal_lag_sum'] / samples, 2),
+                            'max_thermal_lag': round(self._log_stats['thermal_lag_max'], 1),
+                        },
+                        
+                        # Heater stats
+                        'heater': {
+                            'avg_pwm': round(self._log_stats['pwm_sum'] / samples, 3),
+                            'max_pwm': round(self._log_stats['pwm_max'], 3),
+                            'pwm_maxed_pct': pwm_maxed_pct,
+                        },
+                        
+                        # Flow stats
+                        'flow': {
+                            'avg_flow': round(self._log_stats['flow_sum'] / samples, 2),
+                            'max_flow': round(self._log_stats['flow_max'], 2),
+                            'max_speed': round(self._log_stats['speed_max'], 1),
+                        },
+                        
+                        # Dynamic PA stats
+                        'dynamic_pa': {
+                            'pa_min': round(pa_min, 4),
+                            'pa_max': round(self._log_stats['pa_max'], 4),
+                            'pa_range': pa_range,
+                            'pa_avg': round(self._log_stats['pa_sum'] / samples, 4) if samples > 0 else 0,
+                        },
+                        
+                        # Dynamic Z-Window stats
+                        'dynamic_z': {
+                            'active_pct': dynz_active_pct,
+                            'accel_min': accel_min,
+                        },
+                        
+                        # Smart Cooling stats
+                        'smart_cooling': {
+                            'fan_avg': round(self._log_stats['fan_sum'] / samples, 1),
+                            'fan_min': self._log_stats['fan_min'],
+                            'fan_max': self._log_stats['fan_max'],
+                            'fan_adjustments': self._log_stats['fan_adjustments'],
+                        },
+                        
+                        # Legacy flat fields for backward compatibility
                         'avg_boost': round(self._log_stats['boost_sum'] / samples, 2),
                         'max_boost': round(self._log_stats['boost_max'], 1),
                         'avg_pwm': round(self._log_stats['pwm_sum'] / samples, 3),
@@ -623,9 +749,9 @@ class ExtruderMonitor:
                         'avg_thermal_lag': round(self._log_stats['thermal_lag_sum'] / samples, 2),
                         'dynz_active_pct': dynz_active_pct,
                         'accel_min': accel_min,
-                        'fan_avg': fan_avg,
-                        'fan_min': fan_min,
-                        'fan_max': fan_max,
+                        'fan_avg': round(self._log_stats['fan_sum'] / samples, 1),
+                        'fan_min': self._log_stats['fan_min'],
+                        'fan_max': self._log_stats['fan_max'],
                     }
                     
                     # Write summary JSON
@@ -635,8 +761,28 @@ class ExtruderMonitor:
                         json.dump(summary, f, indent=2)
                     
                     gcmd.respond_info(f"AT_LOG: Session ended - {samples} samples over {summary['duration_min']}min")
-                    gcmd.respond_info(f"AT_LOG: Avg boost: {summary['avg_boost']}C, Max: {summary['max_boost']}C")
-                    gcmd.respond_info(f"AT_LOG: Avg PWM: {summary['avg_pwm']:.1%}, Max: {summary['max_pwm']:.1%}")
+                    
+                    # Feature summary
+                    at = summary['auto_temp']
+                    gcmd.respond_info(f"AT_LOG: Temp: {at['temp_min']}-{at['temp_max']}C (range {at['temp_range']}C), Boost avg:{at['avg_boost']}C max:{at['max_boost']}C")
+                    
+                    h = summary['heater']
+                    gcmd.respond_info(f"AT_LOG: Heater: PWM avg:{h['avg_pwm']:.1%} max:{h['max_pwm']:.1%}, at 100%: {h['pwm_maxed_pct']}% of print")
+                    
+                    f = summary['flow']
+                    gcmd.respond_info(f"AT_LOG: Flow: avg:{f['avg_flow']:.1f} max:{f['max_flow']:.1f} mm³/s, Speed max:{f['max_speed']:.0f}mm/s")
+                    
+                    pa = summary['dynamic_pa']
+                    if pa['pa_max'] > 0:
+                        gcmd.respond_info(f"AT_LOG: PA: {pa['pa_min']:.4f}-{pa['pa_max']:.4f} (range {pa['pa_range']:.4f})")
+                    
+                    dz = summary['dynamic_z']
+                    if dz['active_pct'] > 0:
+                        gcmd.respond_info(f"AT_LOG: DynZ: active {dz['active_pct']}% of print, min accel {dz['accel_min']}")
+                    
+                    sc = summary['smart_cooling']
+                    gcmd.respond_info(f"AT_LOG: Cooling: {sc['fan_min']}-{sc['fan_max']}% (avg {sc['fan_avg']:.0f}%), {sc['fan_adjustments']} adjustments")
+                    
                     gcmd.respond_info(f"AT_LOG: Summary saved to {summary_path}")
                     logger.info(f"Print log summary: {summary}")
                 
