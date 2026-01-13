@@ -183,7 +183,20 @@ def run_analysis(auto_apply=False, provider=None):
         
         # Send key results to Klipper console
         if CONFIG['notify_console']:
+            if result.returncode != 0:
+                send_console_message(f"AF: Analysis failed (exit code {result.returncode})")
+                if result.stderr:
+                    # Send first line of error
+                    err_line = result.stderr.strip().split('\n')[0][:80]
+                    send_console_message(f"AF: Error: {err_line}")
+                return False
+            
+            if not result.stdout.strip():
+                send_console_message("AF: Analysis completed but no output generated")
+                return True
+            
             lines = result.stdout.split('\n')
+            sent_count = 0
             for line in lines:
                 # Skip decorative lines
                 if line.startswith('===') or line.startswith('---') or not line.strip():
@@ -194,17 +207,25 @@ def run_analysis(auto_apply=False, provider=None):
                     'critical issue', 'other issue', 'suggestion',
                     'Report:', 'Mainsail:', '🎉', '✅', '⚠️', '❌', '🔴', '🟡', '💡'
                 ]):
-                    # Clean up line for console (remove emojis that may not render)
                     clean_line = line.strip()
                     send_console_message(f"AF: {clean_line}")
+                    sent_count += 1
+            
+            if sent_count == 0:
+                # Fallback: send first few non-empty lines
+                send_console_message("AF: Analysis complete (see log for details)")
         
         return result.returncode == 0
         
     except subprocess.TimeoutExpired:
         logger.error("Analysis timed out")
+        if CONFIG['notify_console']:
+            send_console_message("AF: Analysis timed out after 120 seconds")
         return False
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
+        if CONFIG['notify_console']:
+            send_console_message(f"AF: Analysis error: {str(e)[:60]}")
         return False
 
 
