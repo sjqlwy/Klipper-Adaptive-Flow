@@ -169,7 +169,7 @@ Edit `auto_flow.cfg` to customize:
 ```ini
 variable_multi_object_temp_wait: True     # Enable/disable feature
 variable_temp_wait_tolerance: 5.0         # Temperature tolerance (°C)
-variable_temp_wait_timeout: 300           # Max wait time (seconds, 0=infinite)
+variable_temp_wait_timeout: 300           # Reserved for future use
 ```
 
 ### Slicer Setup

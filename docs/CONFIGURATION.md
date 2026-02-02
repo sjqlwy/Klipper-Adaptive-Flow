@@ -152,7 +152,7 @@ Prevents thermal runaway when printing multiple objects sequentially:
 ```ini
 variable_multi_object_temp_wait: True      # Enable automatic temp stabilization
 variable_temp_wait_tolerance: 5.0          # Temperature tolerance (°C)
-variable_temp_wait_timeout: 300            # Max wait time (seconds, 0=infinite)
+variable_temp_wait_timeout: 300            # Reserved for future use
 ```
 
 **How it works:**
@@ -160,6 +160,7 @@ variable_temp_wait_timeout: 300            # Max wait time (seconds, 0=infinite)
 - If yes, pauses and waits for temperature to stabilize within tolerance range
 - Prevents thermal runaway shutdowns when previous object ended at higher temperature
 - Works automatically with EXCLUDE_OBJECT (OrcaSlicer, PrusaSlicer) and M486 (legacy)
+- Waits indefinitely until temperature stabilizes (safer than timing out)
 
 **Example scenario:**
 1. Object 1 finishes at 253°C (boosted from 220°C base)
