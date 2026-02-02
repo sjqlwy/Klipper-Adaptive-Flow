@@ -212,6 +212,12 @@ This feedback loop helps the heater reach target temperature even with high-powe
 
 **Perfect for:** Revo HF with 40W heater + CPAP fans at high speeds
 
+> **⚠️ IMPORTANT for CPAP users with 40W heaters:**
+> If your heater struggles even at low fan speeds (e.g., >20%), you need more aggressive settings:
+> - Set `sc_heater_duty_threshold: 0.85` (start reducing earlier)
+> - Set `sc_heater_duty_k: 2.0` or higher (reduce more aggressively)
+> - Consider reducing `sc_base_fan` or slicer fan speed if still struggling
+
 ### Example Calculation
 
 Settings: base_fan=100%, flow_gate=8, flow_k=0.03, min=30%, max=70% (PETG)
@@ -247,14 +253,23 @@ variable_sc_max_fan: 0.80          # Never above 80%
 ```
 
 ### For Heater-Adaptive Control (CPAP fans)
+
+**For CPAP fans with 40W heaters** (observed heater struggle at >20% fan):
 ```ini
-# More aggressive fan reduction when heater struggles
+# Aggressive settings for high-power CPAP fans
 variable_sc_heater_duty_threshold: 0.85  # Start reducing at 85% duty (was 90%)
 variable_sc_heater_duty_k: 2.0           # Double the duty excess (at 95% duty: 20% reduction)
+# May also need to lower base fan speed if still struggling
+```
 
+**For standard part cooling fans**:
+```ini
 # Less aggressive (for standard fans)
 variable_sc_heater_duty_k: 0.5           # Half the duty excess (at 95% duty: 2.5% reduction)
+```
 
+**To disable**:
+```ini
 # Or disable if you don't have high-power fans
 variable_sc_heater_adaptive: False
 ```
