@@ -48,7 +48,7 @@ variable_sc_first_layer_fan: 0.0
 # Heater-adaptive fan control (enabled by default)
 variable_sc_heater_adaptive: True
 variable_sc_heater_duty_threshold: 0.90  # Start reducing fan at 90% duty
-variable_sc_heater_duty_k: 0.01          # 1% fan reduction per 1% duty above threshold
+variable_sc_heater_duty_k: 1.0           # 1.0 = match duty excess 1:1
 ```
 
 ### Parameter Guide
@@ -66,7 +66,7 @@ variable_sc_heater_duty_k: 0.01          # 1% fan reduction per 1% duty above th
 | `sc_first_layer_fan` | First layer fan override (0.0-1.0) | 0.0 |
 | `sc_heater_adaptive` | Enable heater-adaptive fan reduction | True |
 | `sc_heater_duty_threshold` | Heater duty % where fan reduction starts | 0.90 |
-| `sc_heater_duty_k` | Fan reduction per 1% duty above threshold | 0.01 |
+| `sc_heater_duty_k` | Fan reduction multiplier (1.0 = match duty excess 1:1) | 1.0 |
 
 ## Material Profile Overrides
 
@@ -201,8 +201,8 @@ Every 1 second, Smart Cooling calculates the optimal fan speed:
 When `sc_heater_adaptive` is enabled (default), Smart Cooling monitors the heater's duty cycle and automatically reduces fan speed if the heater is struggling:
 
 - At **90% duty cycle** (default threshold): Fan reduction begins
-- At **95% duty cycle**: Fan is reduced by 5% (with default k=0.01)
-- At **99% duty cycle**: Fan is reduced by 9%
+- At **95% duty cycle**: Fan is reduced by 5% (with default k=1.0: (0.95-0.90)*1.0 = 0.05 = 5%)
+- At **99% duty cycle**: Fan is reduced by 9% (with default k=1.0: (0.99-0.90)*1.0 = 0.09 = 9%)
 
 This feedback loop helps the heater reach target temperature even with high-power CPAP fans:
 1. CPAP fan runs at 70% → heater struggles at 95% duty
@@ -250,7 +250,10 @@ variable_sc_max_fan: 0.80          # Never above 80%
 ```ini
 # More aggressive fan reduction when heater struggles
 variable_sc_heater_duty_threshold: 0.85  # Start reducing at 85% duty (was 90%)
-variable_sc_heater_duty_k: 0.02          # 2% reduction per 1% duty (was 1%)
+variable_sc_heater_duty_k: 2.0           # Double the duty excess (at 95% duty: 20% reduction)
+
+# Less aggressive (for standard fans)
+variable_sc_heater_duty_k: 0.5           # Half the duty excess (at 95% duty: 2.5% reduction)
 
 # Or disable if you don't have high-power fans
 variable_sc_heater_adaptive: False
