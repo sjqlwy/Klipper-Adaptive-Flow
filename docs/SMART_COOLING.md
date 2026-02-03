@@ -108,6 +108,8 @@ Check Smart Cooling status during a print:
 AT_SC_STATUS
 ```
 
+> See [COMMANDS.md](COMMANDS.md#at_sc_status) for full command documentation.
+
 Output:
 ```
 ===== SMART COOLING STATUS =====
