@@ -122,11 +122,15 @@ Set these base temperatures in your slicer. The system will automatically boost 
 
 | Command | Description |
 |---------|-------------|
+| `AT_START MATERIAL=X` | Enable adaptive flow (call in PRINT_START) |
+| `AT_END` | Disable adaptive flow (call in PRINT_END) |
 | `AT_STATUS` | Show current state, flow, boost, PA |
 | `AT_DYNZ_STATUS` | Show Dynamic Z-Window learning state |
 | `AT_SC_STATUS` | Show Smart Cooling status |
 | `AT_SET_PA MATERIAL=X PA=Y` | Save calibrated PA |
 | `AT_LIST_PA` | Show all PA values |
+
+**[Full command reference →](docs/COMMANDS.md)**
 
 ## How It Works
 

@@ -65,6 +65,8 @@ Check DynZ status during a print:
 AT_DYNZ_STATUS
 ```
 
+> See [COMMANDS.md](COMMANDS.md#at_dynz_status) for full command documentation.
+
 Output:
 ```
 ===== DYNZ STATUS =====
