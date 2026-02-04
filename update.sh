@@ -15,7 +15,20 @@ cd "$REPO_DIR"
 
 # Pull latest changes
 echo "📥 Fetching updates from GitHub..."
-git pull
+if ! git pull --ff-only; then
+    echo ""
+    echo "⚠️  Git pull failed!"
+    echo "This usually happens when:"
+    echo "  1. You have local changes in the repository"
+    echo "  2. There are merge conflicts"
+    echo ""
+    echo "To fix this:"
+    echo "  - Run 'git status' to see local changes"
+    echo "  - Run 'git stash' to save your local changes temporarily"
+    echo "  - Try running this script again"
+    echo "  - Run 'git stash pop' to restore your changes"
+    exit 1
+fi
 
 # Copy Python modules (always safe to update)
 echo "📁 Updating Python modules..."

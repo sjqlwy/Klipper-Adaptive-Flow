@@ -38,7 +38,7 @@ Higher temperature = lower filament viscosity = less PA needed.
 
 ### User-Editable Profiles
 
-Material profiles are defined in `material_profiles_user.cfg` or `material_profiles_defaults.cfg`. Edit this file to customize boost curves for your filaments.
+Material profiles are defined in `material_profiles_defaults.cfg` (system defaults) and `material_profiles_user.cfg` (custom materials). To customize or add materials, edit `material_profiles_user.cfg`.
 
 Each profile is a Klipper macro:
 ```ini
