@@ -85,6 +85,8 @@ The `MATERIAL` parameter is passed from your slicer's start G-code (see above). 
 Edit `auto_flow_user.cfg`:
 ```ini
 variable_use_high_flow_nozzle: True   # False for standard Revo
+
+variable_sc_heater_wattage:  40  # 40 (40W heater - more aggressive), 60 (60W heater - standard), 0 (custom/manual)
 ```
 
 
