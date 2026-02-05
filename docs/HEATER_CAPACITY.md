@@ -150,7 +150,7 @@ Max sustainable = 16 × 0.867 × 0.79 = 10.9 mm³/s
 
 The system activates flow limiting when **either** condition is met:
 
-- **High duty cycle:** Heater PWM > `heater_flow_limit_duty` (default 85%)
+- **High duty cycle:** Heater PWM > `heater_flow_limit_duty` (default 0.85 = 85%)
 - **Temperature deficit:** Actual temp is more than `heater_temp_deficit_threshold` (default 8°C) below target
 
 ### 3. Backoff Calculation
