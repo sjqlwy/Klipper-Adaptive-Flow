@@ -404,7 +404,8 @@ class ExtruderMonitor:
                 self._log_writer.writerow([
                     'elapsed_s', 'temp_actual', 'temp_target', 'boost',
                     'flow', 'speed', 'pwm', 'pa', 'z_height', 'predicted_flow',
-                    'dynz_active', 'accel', 'fan_pct'
+                    'dynz_active', 'accel', 'fan_pct', 'effective_flow',
+                    'flow_limited', 'backoff_pct', 'sustainable_flow'
                 ])
                 
                 self._log_start_time = time.time()
@@ -489,6 +490,10 @@ class ExtruderMonitor:
                 dynz_active = gcmd.get_int('DYNZ', 0)
                 accel = gcmd.get_int('ACCEL', 0)
                 fan_pct = gcmd.get_int('FAN', 0)
+                effective_flow = gcmd.get_float('EFFECTIVE_FLOW', 0.0)
+                flow_limited = gcmd.get_int('FLOW_LIMITED', 0)
+                backoff_pct = gcmd.get_int('BACKOFF_PCT', 0)
+                sustainable_flow = gcmd.get_float('SUSTAINABLE_FLOW', 0.0)
                 
                 self._log_writer.writerow([
                     f"{elapsed:.1f}",
@@ -503,7 +508,11 @@ class ExtruderMonitor:
                     f"{predicted:.2f}",
                     f"{dynz_active}",
                     f"{accel}",
-                    f"{fan_pct}"
+                    f"{fan_pct}",
+                    f"{effective_flow:.2f}",
+                    f"{flow_limited}",
+                    f"{backoff_pct}",
+                    f"{sustainable_flow:.2f}"
                 ])
                 
                 # Update running stats
@@ -557,6 +566,16 @@ class ExtruderMonitor:
                 if self._log_stats['last_fan'] >= 0 and abs(fan_pct - self._log_stats['last_fan']) >= 3:
                     self._log_stats['fan_adjustments'] += 1
                 self._log_stats['last_fan'] = fan_pct
+                
+                # Heater capacity management stats
+                if 'flow_limited_count' not in self._log_stats:
+                    self._log_stats['flow_limited_count'] = 0
+                    self._log_stats['backoff_pct_max'] = 0
+                    self._log_stats['effective_flow_sum'] = 0.0
+                if flow_limited:
+                    self._log_stats['flow_limited_count'] += 1
+                self._log_stats['backoff_pct_max'] = max(self._log_stats['backoff_pct_max'], backoff_pct)
+                self._log_stats['effective_flow_sum'] += effective_flow
                 
                 # Flush periodically
                 if self._log_sample_count % 60 == 0:

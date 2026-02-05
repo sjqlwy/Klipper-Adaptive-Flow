@@ -65,4 +65,12 @@ variable_use_high_flow_nozzle: True
 # variable_sc_heater_wattage: 0  # 40, 60, or 0 for manual
 # variable_sc_heater_duty_threshold: 0.90
 # variable_sc_heater_duty_k: 1.0
+
+# HEATER CAPACITY MANAGEMENT (uncomment to override)
+# variable_heater_adaptive_flow: True
+# variable_heater_wattage: 40  # 40, 60, or 0 for manual
+# variable_heater_max_sustainable_flow: 0  # mm³/s, 0 = auto
+# variable_heater_flow_limit_duty: 0.85
+# variable_heater_flow_backoff_k: 1.5
+# variable_heater_temp_deficit_threshold: 8.0
 gcode:
