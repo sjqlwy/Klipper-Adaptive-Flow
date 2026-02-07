@@ -284,6 +284,31 @@ The AI analyzes your print data and suggests parameter adjustments:
 - Klipper firmware
 - 40W or 60W heater
 
+## Troubleshooting
+
+### Layer Banding / Z-Axis Artifacts
+
+If you see horizontal bands on your prints that correlate with flow/speed changes:
+
+1. **Increase flow smoothing** in `auto_flow_user.cfg`:
+   ```ini
+   variable_flow_smoothing: 0.30  # Default is 0.25
+   ```
+
+2. **Reduce temperature ramp rate**:
+   ```ini
+   variable_ramp_rate_rise: 2.5  # Default is 3.0
+   ```
+
+3. **Lower material flow boost** (example for PLA):
+   ```gcode
+   AT_SET_FLOW_K K=0.70  # Default for PLA is 0.80
+   ```
+
+Higher smoothing values (0.30-0.35) provide gentler temperature transitions, eliminating visible banding at the cost of slightly slower response to flow changes.
+
+**[Full troubleshooting guide →](docs/CONFIGURATION.md#troubleshooting)**
+
 ## File Structure
 
 | File | Purpose |
