@@ -407,6 +407,7 @@ class ExtruderMonitor:
                     'dynz_active', 'accel', 'fan_pct', 'effective_flow',
                     'flow_limited', 'backoff_pct', 'sustainable_flow'
                 ])
+                self._log_file.flush()  # Ensure header is written to disk
                 
                 self._log_start_time = time.time()
                 self._log_sample_count = 0
@@ -514,6 +515,7 @@ class ExtruderMonitor:
                     f"{backoff_pct}",
                     f"{sustainable_flow:.2f}"
                 ])
+                self._log_file.flush()  # Ensure data is written to disk immediately
                 
                 # Update running stats
                 self._log_sample_count += 1

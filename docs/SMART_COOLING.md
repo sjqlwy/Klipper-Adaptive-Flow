@@ -63,7 +63,8 @@ variable_sc_flow_k: 0.03
 variable_sc_short_layer_time: 15.0
 
 # Extra fan % per second below threshold (0-1 scale)
-variable_sc_layer_time_k: 0.02
+# E.g., 5s layer = (15-5) * 0.04 = 40% boost
+variable_sc_layer_time_k: 0.04
 
 # Min/max fan limits (0.0-1.0 = 0-100%)
 variable_sc_min_fan: 0.20
@@ -92,7 +93,7 @@ variable_sc_heater_duty_k: 1.0           # 1.0 = match duty excess 1:1
 | `sc_flow_gate` | Flow rate (mm³/s) where reduction starts | 8.0 |
 | `sc_flow_k` | Fan reduction per mm³/s above gate (0.03 = 3%) | 0.03 |
 | `sc_short_layer_time` | Layers faster than this get boosted cooling (seconds) | 15.0 |
-| `sc_layer_time_k` | Extra fan per second below threshold (0.02 = 2%) | 0.02 |
+| `sc_layer_time_k` | Extra fan per second below threshold (0.04 = 4%) | 0.04 |
 | `sc_min_fan` | Minimum fan speed (0.0-1.0) | 0.20 |
 | `sc_max_fan` | Maximum fan speed (0.0-1.0) | 1.00 |
 | `sc_first_layer_fan` | First layer fan override (0.0-1.0) | 0.0 |
