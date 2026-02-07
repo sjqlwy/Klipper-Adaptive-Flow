@@ -2,6 +2,33 @@
 
 Smart Cooling automatically adjusts the part cooling fan based on flow rate, layer time, and heater performance, optimizing print quality without manual fan speed management.
 
+## Slicer Setup (Required)
+
+**Important:** Disable the slicer's auto-cooling features to prevent conflicts with Smart Cooling.
+
+### Recommended Slicer Settings (OrcaSlicer / PrusaSlicer / SuperSlicer)
+
+| Setting | Value | Reason |
+|---------|-------|--------|
+| **Min fan speed threshold** | 70-100% | Your baseline fan speed |
+| **Max fan speed threshold** | Same as min | Flat fan - let Smart Cooling adjust |
+| **No cooling for the first** | 1 layer | SC also skips layer 1 |
+| **Full fan speed at layer** | 2 | SC takes over after layer 1 |
+| **Keep fan always on** | ☑️ ON | Let SC have control |
+| **Slow printing down for better layer cooling** | ☐ **OFF** | **Critical** - causes inconsistent layer times and banding |
+
+### Why Disable "Slow Printing Down"?
+
+This slicer feature reduces print speed on short layers instead of increasing fan speed. This causes:
+- Inconsistent layer times that confuse the adaptive system
+- Visible banding at speed transition boundaries
+- Conflicts with flow-based temperature control
+
+Smart Cooling handles short layers by **boosting fan speed** instead, which:
+- Maintains consistent print speed and quality
+- Works with (not against) the temperature control system
+- Eliminates speed-induced banding
+
 ## How It Works
 
 1. **Flow-based reduction**: At high flow rates, the fast-moving plastic creates its own airflow and needs less fan cooling. Smart Cooling reduces fan speed proportionally.
@@ -48,10 +75,10 @@ variable_sc_first_layer_fan: 0.0
 # Heater-adaptive fan control (enabled by default)
 variable_sc_heater_adaptive: True
 
-# Heater wattage profile (NEW - recommended)
-variable_sc_heater_wattage: 40  # Set to 40 for 40W heater, 60 for 60W heater, 0 for manual
+# Heater wattage profile (inherits from heater_wattage if 0)
+variable_sc_heater_wattage: 0  # 0 = use heater_wattage setting, or 40/60 to override
 
-# Manual settings (only used when sc_heater_wattage = 0)
+# Manual settings (only used when both wattage settings are 0)
 variable_sc_heater_duty_threshold: 0.90  # Start reducing fan at 90% duty
 variable_sc_heater_duty_k: 1.0           # 1.0 = match duty excess 1:1
 ```
@@ -61,7 +88,7 @@ variable_sc_heater_duty_k: 1.0           # 1.0 = match duty excess 1:1
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `sc_enable` | Master enable/disable | True |
-| `sc_base_fan` | Base fan speed (0-255). 0 = use slicer's M106 value | 0 |
+| `sc_base_fan` | Base fan speed (0-255). 0 = use slicer's M106 value (recommended) | 0 |
 | `sc_flow_gate` | Flow rate (mm³/s) where reduction starts | 8.0 |
 | `sc_flow_k` | Fan reduction per mm³/s above gate (0.03 = 3%) | 0.03 |
 | `sc_short_layer_time` | Layers faster than this get boosted cooling (seconds) | 15.0 |
@@ -70,7 +97,7 @@ variable_sc_heater_duty_k: 1.0           # 1.0 = match duty excess 1:1
 | `sc_max_fan` | Maximum fan speed (0.0-1.0) | 1.00 |
 | `sc_first_layer_fan` | First layer fan override (0.0-1.0) | 0.0 |
 | `sc_heater_adaptive` | Enable heater-adaptive fan reduction | True |
-| `sc_heater_wattage` | Heater profile: 40 (40W), 60 (60W), 0 (manual) | 0 |
+| `sc_heater_wattage` | Heater profile: 40 (40W), 60 (60W), 0 (inherit from heater_wattage) | 0 |
 | `sc_heater_duty_threshold` | Heater duty % where fan reduction starts (manual mode) | 0.90 |
 | `sc_heater_duty_k` | Fan reduction multiplier (manual mode) | 1.0 |
 
