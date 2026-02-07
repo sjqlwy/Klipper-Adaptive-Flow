@@ -284,6 +284,40 @@ The system normalizes variations like `PLA+`, `PETG-CF`, `ABS-GF` to their base 
 - Decrease `ramp_fall` (slower cooldown prevents ooze)
 - Increase `speed_boost_k` for more heat during fast moves
 
+### Layer Banding / Z-Axis Artifacts
+**Symptoms**: Visible horizontal bands or inconsistencies correlating with flow/speed changes
+
+**Root Cause**: Temperature changes from adaptive flow are too aggressive or not smooth enough
+
+**Solutions** (in order of effectiveness):
+1. **Increase flow_smoothing** (most effective for banding)
+   - Default: 0.25
+   - Try: 0.30-0.35 for smoother transitions
+   - Higher values = slower temperature response = less visible banding
+   ```ini
+   variable_flow_smoothing: 0.30
+   ```
+
+2. **Reduce temperature ramp rates**
+   - Default: ramp_rate_rise = 3.0 °C/s
+   - Try: 2.0-2.5 °C/s for gentler transitions
+   ```ini
+   variable_ramp_rate_rise: 2.5
+   ```
+
+3. **Lower material flow_k** (in material profile or via AT_SET_FLOW_K)
+   - PLA default: 0.80 (was 1.00 in older versions)
+   - Try: 0.60-0.70 for less aggressive boost
+   ```gcode
+   AT_SET_FLOW_K K=0.70
+   ```
+
+4. **Verify mechanical issues first**
+   - Check Z-axis binding, belt tension, and acceleration settings
+   - Rule out non-software causes before tuning
+
+**Trade-offs**: More smoothing reduces banding but may cause slight under-heating during rapid flow increases. For most prints, this is not noticeable and print quality improves.
+
 ### Heaters stay on after print
 - Ensure `AT_END` is called before `TURN_OFF_HEATERS` in PRINT_END
 
