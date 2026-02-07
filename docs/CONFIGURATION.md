@@ -327,7 +327,7 @@ The system normalizes variations like `PLA+`, `PETG-CF`, `ABS-GF` to their base 
 - Default `ramp_rate_rise` is 3.0 °C/s (heating)
 - Default `ramp_rate_fall` was 1.0 °C/s (cooling) - **now 1.5 °C/s**
 - A 3:1 ratio creates visible asymmetry on cube faces
-- The temperature boost directly affects Pressure Advance via `pa_reduction = boost × pa_boost_k`
+- The temperature boost directly affects Pressure Advance via `pa_adjustment = boost × pa_boost_k`
 - Different temperatures on different faces → different PA → different extrusion characteristics
 
 **Solutions**:
@@ -337,9 +337,9 @@ The system normalizes variations like `PLA+`, `PETG-CF`, `ABS-GF` to their base 
    variable_ramp_rate_fall: 1.5  # Increased from 1.0 to 2:1 ratio
    ```
 
-2. **Recommended ratios**:
-   - Good: 1.5:1 to 2:1 (e.g., 3.0/1.5 or 4.0/2.0)
-   - Acceptable: 2:1 to 2.5:1
+2. **Recommended ratios** (rise/fall):
+   - Good: 1.5:1 to 2:1 inclusive (e.g., 3.0/2.0 or 3.0/1.5)
+   - Acceptable: 2:1 to 2.5:1 (e.g., 5.0/2.0)
    - Problematic: >2.5:1 (creates visible directional artifacts)
 
 3. **For severe cases**, match the rates completely:
