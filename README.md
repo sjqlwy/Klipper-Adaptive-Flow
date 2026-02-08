@@ -30,6 +30,11 @@ sudo systemctl restart klipper
 
 Add to `printer.cfg`:
 ```ini
+# REQUIRED: Klipper only allows ONE [save_variables] section
+# If you already have one, keep it. Otherwise add:
+[save_variables]
+filename: ~/printer_data/config/variables.cfg
+
 [include auto_flow_defaults.cfg]
 [include auto_flow_user.cfg]
 [include material_profiles_defaults.cfg]
@@ -37,6 +42,8 @@ Add to `printer.cfg`:
 [gcode_interceptor]
 [extruder_monitor]
 ```
+
+**Important:** If you already have a `[save_variables]` section (from BTT Eddy, Klicky, etc.), **do not add another one**. Adaptive Flow will use your existing variables file.
 
 **Edit your settings:** Open `~/printer_data/config/auto_flow_user.cfg` and uncomment/modify any values you want to customize.
 
