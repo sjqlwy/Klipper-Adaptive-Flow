@@ -743,6 +743,12 @@ class ExtruderMonitor:
         pred_rate = self._predicted_extrusion_rate()
         status['predicted_extrusion_rate'] = pred_rate
         
+        # Also expose current/recent extrusion rate
+        current_rate = 0.0
+        if self._recent_rates:
+            current_rate = self._recent_rates[-1]  # Most recent rate
+        status['current_extrusion_rate'] = current_rate
+        
         return status
 
 
